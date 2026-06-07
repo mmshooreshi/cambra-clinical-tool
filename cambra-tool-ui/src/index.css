@@ -114,6 +114,18 @@ code {
 }
  */
 
+
+
+
+.rtl{
+  direction: rtl;
+}
+
+.ltr {
+  direction: ltr;
+}
+
+
 body {
   font-family: 'Vazirmatn', sans-serif;
   font-optical-sizing: auto;
@@ -122,4 +134,11 @@ body {
 
 }
 
+* {
+  font-family: 'Vazirmatn', sans-serif;
+}
 
+
+.monofont {
+  font-family: monospace !important;
+}
