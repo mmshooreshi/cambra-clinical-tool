@@ -1252,8 +1252,8 @@ export default function CambraApp() {
                                             onChange={e => {
                                                 let v = e.target.value;
                                                 // Normalise Persian/Arabic numerals → ASCII digits
-                                                v = v.replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 1728 + 48));
-                                                v = v.replace(/[٠-٩]/g, d => String.fromCharCode(d.charCodeAt(0) - 1632 + 48));
+                                                // v = v.replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 1728 + 48));
+                                                // v = v.replace(/[٠-٩]/g, d => String.fromCharCode(d.charCodeAt(0) - 1632 + 48));
                                                 setPatient(p => ({...p, chartNo:v}));
                                             }}
                                             className="w-full text-base font-bold ps-13 pe-12 py-3 border-2 border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:shadow-lg focus:shadow-indigo-100/50 transition-all font-mono bg-white"
