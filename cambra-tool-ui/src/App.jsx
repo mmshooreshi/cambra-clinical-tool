@@ -53,7 +53,7 @@ if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
 
     /* Typing animation for welcome */
     .c-type-wrap{display:inline-block;overflow:hidden;white-space:nowrap;animation:cTypeIn 1.2s cubic-bezier(.22,1,.36,1) both}
-    .c-type-wrap::after{content:'';border-right:2px solid currentColor;animation:cBlink 1s step-end infinite;margin-inline-start:2px}
+    .c-type-wrap::after{content:'';border-right:1px solid currentColor;animation:cBlink 1s step-end infinite;margin-inline-start:2px}
     .c-type-wrap.done::after{border-color:transparent}
 
     .c-blink{animation:cBlink 1s step-end infinite}
