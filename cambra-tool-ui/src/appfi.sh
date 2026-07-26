@@ -1,3 +1,19 @@
+#!/usr/bin/env bash
+# =============================================================================
+# CAMBRA App.jsx Upgrade Script
+# =============================================================================
+set -euo pipefail
+
+APP_FILE="./App.jsx"
+BACKUP_DIR="backups"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+BACKUP_FILE="${BACKUP_DIR}/App.jsx.backup_${TIMESTAMP}"
+
+mkdir -p "$BACKUP_DIR"
+cp "$APP_FILE" "$BACKUP_FILE"
+echo "✅ Backup saved: $BACKUP_FILE"
+
+cat > "$APP_FILE" << 'ENDOFFILE'
 import React, { useState, useMemo, useEffect, useRef, useCallback, createContext, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -857,7 +873,7 @@ function WelcomeScreen({ lang, onStart, t }) {
            {icon:PieChart,label:'Analysis', sub:'Result & plan'}];
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-120px)] px-4 py-8">
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-60px)] px-4 py-8">
             <div className="w-full max-w-md flex flex-col items-center gap-8">
 
                 {/* Brand */}
@@ -1636,3 +1652,19 @@ export default function CambraApp() {
         </div>
     );
 }
+ENDOFFILE
+
+echo "✅ App.jsx upgraded successfully!"
+echo "📦 Backup at: $BACKUP_FILE"
+echo ""
+echo "Summary of changes:"
+echo "  ✓ Welcome screen — clean, professional, no emoji-grid slop"
+echo "  ✓ Score badges — only pop on own value change, no cascade re-animation"
+echo "  ✓ Info drawer — smooth CSS grid-template-rows transition (no spring)"
+echo "  ✓ Desc text loaded from backend (di_N_desc / rf_N_desc / pf_N_desc)"
+echo "  ✓ Each row has independent open/close state"
+echo "  ✓ Chart No field: normalises Persian/Arabic digits → ASCII, displays in lang numeral"
+echo "  ✓ Result cards — rich, textured, pattern-filled, draggable"
+echo "  ✓ ICDAS + Proximal tables — dense, compact, unified card with Tx column"
+echo "  ✓ PDF — Vazirmatn + Amiri fonts, A4 layout, hierarchical section picker, drag-to-reorder"
+echo "  ✓ PDF two-level section hierarchy (parent + children checkboxes)"

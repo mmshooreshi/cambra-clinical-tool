@@ -1,0 +1,1628 @@
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import {
+    Activity, User, Check, AlertCircle, Shield, PieChart,
+    ChevronLeft, ChevronRight, Zap, Stethoscope, ShieldCheck,
+    ClipboardCheck, Calendar, ArrowUpRight, Droplets, Info,
+    ChevronDown, Sparkles, HeartPulse, BookOpen, X, Download,
+    Settings, Shuffle, Eye, EyeOff, GripVertical, FileText,
+    ChevronUp, ArrowLeft, ArrowRight
+} from 'lucide-react';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const FA_DIGITS = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+const toFaNum = (n, lang) => {
+    if (lang !== 'fa') return String(n);
+    return String(n).replace(/\d/g, d => FA_DIGITS[parseInt(d)]);
+};
+const toFaNumStr = (s, lang) => {
+    if (lang !== 'fa') return s;
+    return String(s).replace(/\d/g, d => FA_DIGITS[parseInt(d)]);
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JALALI DATE ENGINE (Complete Implementation)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function gregorianToJalali(gy, gm, gd) {
+    const g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
+    let jy = (gy <= 1600) ? 0 : 979;
+    gy -= (gy <= 1600) ? 621 : 1600;
+    const gy2 = (gm > 2) ? (gy + 1) : gy;
+    let days = (365 * gy) + Math.floor((gy2 + 3) / 4) - Math.floor((gy2 + 99) / 100)
+        + Math.floor((gy2 + 399) / 400) - 80 + gd + g_d_m[gm - 1];
+    jy += 33 * Math.floor(days / 12053);
+    days %= 12053;
+    jy += 4 * Math.floor(days / 1461);
+    days %= 1461;
+    if (days > 365) {
+        jy += Math.floor((days - 1) / 365);
+        days = (days - 1) % 365;
+    }
+    const jm = (days < 186) ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
+    const jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
+    return { jy, jm, jd };
+}
+
+function jalaliToGregorian(jy, jm, jd) {
+    let gy, gm, gd, days;
+    jy += 1595;
+    days = -355668 + (365 * jy) + (Math.floor(jy / 33) * 8) + Math.floor(((jy % 33) + 3) / 4)
+        + jd + ((jm < 7) ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+    gy = 400 * Math.floor(days / 146097);
+    days %= 146097;
+    if (days > 36524) {
+        gy += 100 * Math.floor(--days / 36524);
+        days %= 36524;
+        if (days >= 365) days++;
+    }
+    gy += 4 * Math.floor(days / 1461);
+    days %= 1461;
+    if (days > 365) {
+        gy += Math.floor((days - 1) / 365);
+        days = (days - 1) % 365;
+    }
+    gd = days + 1;
+    const sal_a = [0,31,(((gy%4===0)&&(gy%100!==0))||(gy%400===0))?29:28,31,30,31,30,31,31,30,31,30,31];
+    for (gm = 0; gm < 13 && gd > sal_a[gm]; gm++) gd -= sal_a[gm];
+    return { gy, gm, gd };
+}
+
+function isJalaliLeap(jy) {
+    const breaks = [1,5,9,13,17,22,26,30];
+    const r = jy % 33;
+    return breaks.includes(r);
+}
+
+function jalaliMonthLength(jy, jm) {
+    if (jm <= 6) return 31;
+    if (jm <= 11) return 30;
+    return isJalaliLeap(jy) ? 30 : 29;
+}
+
+const JALALI_MONTHS = ['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+const JALALI_WEEKDAYS_SHORT = ['ش','ی','د','س','چ','پ','ج'];
+const GREGORIAN_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const GREGORIAN_WEEKDAYS_SHORT = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+function getTodayJalali() {
+    const d = new Date();
+    return gregorianToJalali(d.getFullYear(), d.getMonth()+1, d.getDate());
+}
+
+function getTodayGregorian() {
+    const d = new Date();
+    return { gy: d.getFullYear(), gm: d.getMonth()+1, gd: d.getDate() };
+}
+
+function jalaliDayOfWeek(jy, jm, jd) {
+    const { gy, gm, gd } = jalaliToGregorian(jy, jm, jd);
+    const d = new Date(gy, gm - 1, gd);
+    return (d.getDay() + 1) % 7; // Saturday = 0
+}
+
+function gregorianDayOfWeek(gy, gm, gd) {
+    return new Date(gy, gm - 1, gd).getDay(); // Sunday = 0
+}
+
+function isGregorianLeap(gy) {
+    return ((gy % 4 === 0) && (gy % 100 !== 0)) || (gy % 400 === 0);
+}
+
+function gregorianMonthLength(gy, gm) {
+    const lengths = [31, isGregorianLeap(gy) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    return lengths[gm - 1];
+}
+
+function dateToString(y, m, d) {
+    return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CUSTOM CALENDAR PICKER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function CalendarPicker({ value, onChange, lang }) {
+    const isRtl = lang === 'fa';
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    // Parse the value to get view state
+    const parseValue = useCallback(() => {
+        if (isRtl) {
+            // value is jalali string "1405-04-30"
+            if (value) {
+                const [y, m, d] = value.split('-').map(Number);
+                return { year: y, month: m, day: d };
+            }
+            const t = getTodayJalali();
+            return { year: t.jy, month: t.jm, day: t.jd };
+        } else {
+            if (value) {
+                const [y, m, d] = value.split('-').map(Number);
+                return { year: y, month: m, day: d };
+            }
+            const t = getTodayGregorian();
+            return { year: t.gy, month: t.gm, day: t.gd };
+        }
+    }, [value, isRtl]);
+
+    const parsed = parseValue();
+    const [viewYear, setViewYear] = useState(parsed.year);
+    const [viewMonth, setViewMonth] = useState(parsed.month);
+    const [animDir, setAnimDir] = useState(0); // -1 left, 1 right, 0 none
+
+    useEffect(() => {
+        const p = parseValue();
+        setViewYear(p.year);
+        setViewMonth(p.month);
+    }, [value, lang]);
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        document.addEventListener('touchstart', handler);
+        return () => {
+            document.removeEventListener('mousedown', handler);
+            document.removeEventListener('touchstart', handler);
+        };
+    }, []);
+
+    const monthNames = isRtl ? JALALI_MONTHS : GREGORIAN_MONTHS;
+    const weekDays = isRtl ? JALALI_WEEKDAYS_SHORT : GREGORIAN_WEEKDAYS_SHORT;
+    const monthLen = isRtl ? jalaliMonthLength(viewYear, viewMonth) : gregorianMonthLength(viewYear, viewMonth);
+    const firstDow = isRtl ? jalaliDayOfWeek(viewYear, viewMonth, 1) : gregorianDayOfWeek(viewYear, viewMonth, 1);
+
+    const today = isRtl ? getTodayJalali() : getTodayGregorian();
+    const todayY = isRtl ? today.jy : today.gy;
+    const todayM = isRtl ? today.jm : today.gm;
+    const todayD = isRtl ? today.jd : today.gd;
+
+    const prevMonth = () => {
+        setAnimDir(-1);
+        setTimeout(() => setAnimDir(0), 250);
+        if (viewMonth === 1) { setViewMonth(12); setViewYear(viewYear - 1); }
+        else setViewMonth(viewMonth - 1);
+    };
+    const nextMonth = () => {
+        setAnimDir(1);
+        setTimeout(() => setAnimDir(0), 250);
+        if (viewMonth === 12) { setViewMonth(1); setViewYear(viewYear + 1); }
+        else setViewMonth(viewMonth + 1);
+    };
+
+    const selectDay = (d) => {
+        onChange(dateToString(viewYear, viewMonth, d));
+        setOpen(false);
+    };
+
+    const selectToday = () => {
+        if (isRtl) {
+            const t = getTodayJalali();
+            onChange(dateToString(t.jy, t.jm, t.jd));
+        } else {
+            const t = getTodayGregorian();
+            onChange(dateToString(t.gy, t.gm, t.gd));
+        }
+        setOpen(false);
+    };
+
+    const selectYesterday = () => {
+        const yd = new Date();
+        yd.setDate(yd.getDate() - 1);
+        if (isRtl) {
+            const j = gregorianToJalali(yd.getFullYear(), yd.getMonth()+1, yd.getDate());
+            onChange(dateToString(j.jy, j.jm, j.jd));
+        } else {
+            onChange(dateToString(yd.getFullYear(), yd.getMonth()+1, yd.getDate()));
+        }
+        setOpen(false);
+    };
+
+    const displayValue = () => {
+        if (!value) return isRtl ? 'انتخاب تاریخ' : 'Select Date';
+        const [y, m, d] = value.split('-').map(Number);
+        if (isRtl) {
+            return `${toFaNum(d, 'fa')} ${JALALI_MONTHS[m-1]} ${toFaNum(y, 'fa')}`;
+        }
+        return `${GREGORIAN_MONTHS[m-1]} ${d}, ${y}`;
+    };
+
+    // Build calendar grid
+    const cells = [];
+    for (let i = 0; i < firstDow; i++) cells.push(null);
+    for (let d = 1; d <= monthLen; d++) cells.push(d);
+    const remainingCells = (7 - (cells.length % 7)) % 7;
+    for (let i = 0; i < remainingCells; i++) cells.push(null);
+
+    const selectedDay = parsed.day;
+    const selectedMonth = parsed.month;
+    const selectedYear = parsed.year;
+
+    return (
+        <div ref={ref} className="relative w-full">
+            {/* Trigger Button */}
+            <button
+                type="button"
+                onClick={() => setOpen(!open)}
+                className="w-full flex items-center justify-between gap-3 p-3 bg-white border-2 border-slate-200 rounded-2xl font-bold text-base text-slate-900 cursor-pointer hover:border-indigo-400 hover:shadow-lg hover:shadow-indigo-100 active:scale-[0.98] transition-all duration-200"
+            >
+                <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                        <Calendar className="w-4.5 h-4.5 text-white" />
+                    </div>
+                    <span className={`${!value ? 'text-slate-400' : 'text-slate-900'}`}>{displayValue()}</span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Calendar Dropdown */}
+            {open && (
+                <div
+                    className={`absolute ${isRtl ? 'right-0' : 'left-0'} z-50 mt-2 sm:w-[340px] md:w-[85%] bg-white border-2 border-slate-900 rounded-3xl shadow-[8px_8px_0px_rgba(15,23,42,0.8)] overflow-hidden animate-in slide-in-from-top-2 duration-200`}
+                    onClick={e => e.stopPropagation()}
+                >
+                    {/* Quick Buttons */}
+                    <div className="flex gap-2 p-3 border-b border-slate-100 bg-slate-50">
+                        <button
+                            onClick={selectToday}
+                            className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider hover:bg-indigo-700 active:scale-95 transition-all cursor-pointer shadow-md"
+                        >
+                            {isRtl ? 'امروز' : 'Today'}
+                        </button>
+                        <button
+                            onClick={selectYesterday}
+                            className="flex-1 py-2 px-3 rounded-xl bg-slate-200 text-slate-700 text-xs font-black uppercase tracking-wider hover:bg-slate-300 active:scale-95 transition-all cursor-pointer"
+                        >
+                            {isRtl ? 'دیروز' : 'Yesterday'}
+                        </button>
+                    </div>
+
+                    {/* Month Navigation */}
+                    <div className="flex items-center justify-between p-3">
+                        <button
+                            onClick={isRtl ? nextMonth : prevMonth}
+                            className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center cursor-pointer active:scale-90 transition-all"
+                        >
+                            <ChevronRight className="w-4 h-4 text-slate-700" />
+                        </button>
+
+                        <div className="flex items-center gap-2 select-none">
+                            <span className="font-black text-slate-900 text-base">
+                                {monthNames[viewMonth - 1]}
+                            </span>
+                            <span className="font-black text-indigo-600 text-base font-mono">
+                                {toFaNum(viewYear, lang)}
+                            </span>
+                        </div>
+
+                        <button
+                            onClick={isRtl ? prevMonth : nextMonth}
+                            className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center cursor-pointer active:scale-90 transition-all"
+                        >
+                            <ChevronLeft className="w-4 h-4 text-slate-700" />
+                        </button>
+                    </div>
+
+                    {/* Weekday Headers */}
+                    <div className="grid grid-cols-7 px-3">
+                        {weekDays.map((wd, i) => (
+                            <div key={i} className="text-center text-[10px] font-black text-slate-400 uppercase tracking-wider py-1.5">
+                                {wd}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Day Grid */}
+                    <div className={`grid grid-cols-7 gap-1 p-3 pt-1 transition-all duration-200 ${animDir === -1 ? 'translate-x-2 opacity-90' : animDir === 1 ? '-translate-x-2 opacity-90' : ''}`}>
+                        {cells.map((day, idx) => {
+                            if (day === null) return <div key={idx} />;
+                            const isToday = (viewYear === todayY && viewMonth === todayM && day === todayD);
+                            const isSelected = (viewYear === selectedYear && viewMonth === selectedMonth && day === selectedDay);
+
+                            return (
+                                <button
+                                    key={idx}
+                                    onClick={() => selectDay(day)}
+                                    className={`relative w-full aspect-square rounded-lg flex items-center justify-center text-sm font-bold cursor-pointer active:scale-90 transition-all duration-150
+                                        ${isSelected
+                                            ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-300 scale-110 z-10'
+                                            : isToday
+                                                ? 'bg-indigo-50 text-indigo-700 border-2 border-indigo-300 font-black'
+                                                : 'hover:bg-slate-100 text-slate-700 hover:text-slate-900'
+                                        }
+                                    `}
+                                >
+                                    {toFaNum(day, lang)}
+                                    {isToday && !isSelected && (
+                                        <div className="absolute  bottom-[1px] w-[4px] h-[4px] rounded-full bg-indigo-500"></div>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CUSTOM SELECT (Combo Box) - Reusable, Animated, Touch-Friendly
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function CustomSelect({ value, onChange, options, placeholder, lang, icon: Icon }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        document.addEventListener('touchstart', handler);
+        return () => {
+            document.removeEventListener('mousedown', handler);
+            document.removeEventListener('touchstart', handler);
+        };
+    }, []);
+
+    const selectedOption = options.find(o => o.value === value);
+
+    return (
+        <div ref={ref} className="relative w-full">
+            <button
+                type="button"
+                onClick={() => setOpen(!open)}
+                className="w-full flex items-center justify-between gap-3 p-3 bg-white border-2 border-slate-200 rounded-2xl font-bold text-base cursor-pointer hover:border-indigo-400 hover:shadow-lg hover:shadow-indigo-100 active:scale-[0.98] transition-all duration-200"
+            >
+                <div className="flex items-center gap-2.5">
+                    {Icon && (
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center flex-shrink-0 shadow-md">
+                            <Icon className="w-4.5 h-4.5 text-white" />
+                        </div>
+                    )}
+                    <span className={selectedOption ? 'text-slate-900' : 'text-slate-400'}>
+                        {selectedOption ? selectedOption.label : placeholder}
+                    </span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+            </button>
+
+            {open && (
+                <div className="absolute z-50 mt-2 w-full bg-white border-2 border-slate-900 rounded-2xl shadow-[6px_6px_0px_rgba(15,23,42,0.8)] overflow-hidden">
+                    {options.map((opt, idx) => (
+                        <button
+                            key={opt.value}
+                            onClick={() => { onChange(opt.value); setOpen(false); }}
+                            className={`
+                                w-full flex items-center gap-3 px-4 py-3.5 text-start cursor-pointer transition-all duration-150
+                                ${idx < options.length - 1 ? 'border-b border-slate-100' : ''}
+                                ${value === opt.value
+                                    ? 'bg-indigo-50 text-indigo-900'
+                                    : 'hover:bg-slate-50 text-slate-700'
+                                }
+                                active:bg-indigo-100
+                            `}
+                        >
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${value === opt.value ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300'}`}>
+                                {value === opt.value && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="font-bold text-sm">{opt.label}</span>
+                                {opt.desc && <span className="text-xs text-slate-400 font-medium mt-0.5">{opt.desc}</span>}
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ANIMATED SCORE BADGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function ScoreBadge({ value, sign, color, lang }) {
+    const [animate, setAnimate] = useState(false);
+
+    useEffect(() => {
+        setAnimate(true);
+        const t = setTimeout(() => setAnimate(false), 600);
+        return () => clearTimeout(t);
+    }, [value]);
+
+    const displayVal = toFaNum(Math.abs(value), lang);
+
+    const gradients = {
+        red: 'from-red-500 to-rose-600',
+        amber: 'from-amber-400 to-orange-500',
+        emerald: 'from-emerald-400 to-teal-500',
+    };
+    const shadows = {
+        red: 'shadow-red-300',
+        amber: 'shadow-amber-300',
+        emerald: 'shadow-emerald-300',
+    };
+    const borders = {
+        red: 'border-red-600',
+        amber: 'border-amber-500',
+        emerald: 'border-emerald-500',
+    };
+
+    return (
+        <div className={`
+            inline-flex items-center gap-0.5 px-2.5 py-1 rounded-xl
+            bg-gradient-to-r ${gradients[color]}
+            border-2 ${borders[color]}
+            shadow-lg ${shadows[color]}
+            text-white font-black text-sm font-mono
+            transition-all duration-500
+            ${animate ? 'scale-125 rotate-[-3deg]' : 'scale-100 rotate-0'}
+        `} dir="ltr">
+            <span className="opacity-80">{sign}</span>
+            <span>{displayVal}</span>
+        </div>
+    );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INFO DRAWER (Expandable clinical description)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function InfoDrawer({ shortHint, fullText, color }) {
+    const [open, setOpen] = useState(false);
+    const colors = {
+        red:     { btn: 'text-red-500 hover:bg-red-50 active:bg-red-100',     bg: 'bg-red-50 border-red-200 text-red-900' },
+        amber:   { btn: 'text-amber-600 hover:bg-amber-50 active:bg-amber-100', bg: 'bg-amber-50 border-amber-200 text-amber-900' },
+        emerald: { btn: 'text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100', bg: 'bg-emerald-50 border-emerald-200 text-emerald-900' },
+    };
+    const c = colors[color] || colors.red;
+
+    return (
+        <div className="ms-10 mt-1.5">
+            <button
+                type="button"
+                onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
+                className={`flex items-center gap-1.5 text-xs font-bold py-1 px-2.5 rounded-xl transition-all duration-200 cursor-pointer ${c.btn}`}
+            >
+                <Info className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate max-w-[200px] sm:max-w-none">{shortHint}</span>
+                <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+            </button>
+            <div
+                className={`overflow-hidden transition-all duration-300 ease-out ${open ? 'max-h-[500px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}
+                onClick={e => e.stopPropagation()}
+            >
+                <div className={`p-3.5 rounded-2xl border-2 text-xs leading-relaxed font-medium ${c.bg}`}>
+                    {fullText}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PDF EXPORT MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function PdfExportModal({ open, onClose, lang, patient, results, config, diseaseInd, riskFact, protFact }) {
+    const isRtl = lang === 'fa';
+    const t = config?.dict?.[lang];
+
+    const defaultSections = [
+        { id: 'patient',   label: isRtl ? 'اطلاعات بیمار' : 'Patient Info',     checked: true, icon: User },
+        { id: 'disease',   label: isRtl ? 'شاخص‌های بیماری' : 'Disease Indicators', checked: true, icon: AlertCircle },
+        { id: 'risk',      label: isRtl ? 'عوامل خطر' : 'Risk Factors',        checked: true, icon: Zap },
+        { id: 'protect',   label: isRtl ? 'عوامل محافظتی' : 'Protective Factors', checked: true, icon: Shield },
+        { id: 'result',    label: isRtl ? 'نتیجه و امتیاز' : 'Result & Score',   checked: true, icon: PieChart },
+        { id: 'icdas',     label: isRtl ? 'جدول ICDAS' : 'ICDAS Table',        checked: true, icon: ClipboardCheck },
+        { id: 'plan',      label: isRtl ? 'برنامه درمانی' : 'Action Plan',      checked: true, icon: FileText },
+    ];
+
+    const [sections, setSections] = useState(defaultSections);
+
+    useEffect(() => {
+        if (open) setSections(defaultSections);
+    }, [open, lang]);
+
+    const toggleSection = (id) => {
+        setSections(prev => prev.map(s => s.id === id ? { ...s, checked: !s.checked } : s));
+    };
+
+    const generatePdf = () => {
+        // Build printable HTML
+        const activeKeys = sections.filter(s => s.checked).map(s => s.id);
+        const jalaliDate = (() => {
+            if (!patient.date) return '';
+            const [y, m, d] = patient.date.split('-').map(Number);
+            if (isRtl) {
+                return `${toFaNum(d, 'fa')} ${JALALI_MONTHS[m-1]} ${toFaNum(y, 'fa')}`;
+            }
+            const { jy, jm, jd } = gregorianToJalali(y, m, d);
+            return `${d} ${GREGORIAN_MONTHS[m-1]} ${y}`;
+        })();
+
+        const riskLabels = { lowRisk: t?.lowRisk, moderateRisk: t?.moderateRisk, highRisk: t?.highRisk, extremeRisk: t?.extremeRisk };
+        const riskColors = { lowRisk: '#059669', moderateRisk: '#d97706', highRisk: '#dc2626', extremeRisk: '#7f1d1d' };
+
+        let html = `<!DOCTYPE html><html dir="${isRtl ? 'rtl' : 'ltr'}" lang="${lang}"><head><meta charset="UTF-8"><title>CAMBRA Report</title>`;
+        html += `<style>
+            @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap');
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: Vazirmatn, system-ui, sans-serif; padding: 40px; color: #1e293b; font-size: 14px; line-height: 1.7; }
+            h1 { font-size: 28px; font-weight: 900; margin-bottom: 4px; }
+            h2 { font-size: 16px; font-weight: 900; margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 3px solid #e2e8f0; text-transform: uppercase; letter-spacing: 2px; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 4px solid #0f172a; }
+            .badge { display: inline-block; padding: 6px 18px; border-radius: 12px; color: white; font-weight: 900; font-size: 18px; }
+            .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
+            .label { font-weight: 700; color: #64748b; font-size: 12px; text-transform: uppercase; }
+            .val { font-weight: 700; }
+            ul { padding-${isRtl ? 'right' : 'left'}: 20px; }
+            li { margin: 4px 0; }
+            table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+            th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: ${isRtl ? 'right' : 'left'}; font-size: 12px; }
+            th { background: #f1f5f9; font-weight: 900; }
+            .score-box { text-align: center; padding: 20px; background: #f8fafc; border-radius: 16px; border: 2px solid #e2e8f0; margin: 12px 0; }
+            .score-num { font-size: 48px; font-weight: 900; font-family: monospace; }
+            @media print { body { padding: 20px; } }
+        </style></head><body>`;
+
+        // Header
+        html += `<div class="header"><div><h1>CAMBRA</h1><span style="color:#64748b;font-weight:700;font-size:12px;letter-spacing:3px;">${isRtl ? 'گزارش ارزیابی ریسک پوسیدگی' : 'CARIES RISK ASSESSMENT REPORT'}</span></div>`;
+        html += `<div style="text-align:${isRtl ? 'left' : 'right'}"><span style="color:#64748b;font-size:12px;">${jalaliDate}</span><br/>`;
+        html += `<span class="badge" style="background:${riskColors[results?.finalCat]}">${riskLabels[results?.finalCat] || ''}</span></div></div>`;
+
+        if (activeKeys.includes('patient')) {
+            html += `<h2>${isRtl ? '👤 اطلاعات بیمار' : '👤 Patient Info'}</h2>`;
+            html += `<div class="grid2">`;
+            html += `<div><span class="label">${t?.patientName}:</span> <span class="val">${patient.name}</span></div>`;
+            html += `<div><span class="label">${t?.chartNo}:</span> <span class="val">${toFaNumStr(patient.chartNo, lang)}</span></div>`;
+            html += `<div><span class="label">${t?.assessmentType}:</span> <span class="val">${patient.assessmentType === 'baseline' ? t?.baseline : t?.recall}</span></div>`;
+            html += `<div><span class="label">${t?.date}:</span> <span class="val">${jalaliDate}</span></div>`;
+            html += `</div>`;
+        }
+
+        const renderChecklist = (arr, prefix, title) => {
+            const items = arr.map((v, i) => v ? t?.[`${prefix}_${i+1}`] : null).filter(Boolean);
+            html += `<h2>${title}</h2>`;
+            if (items.length === 0) {
+                html += `<p style="color:#94a3b8;font-style:italic;">${isRtl ? 'موردی انتخاب نشده' : 'None selected'}</p>`;
+            } else {
+                html += `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+            }
+        };
+
+        if (activeKeys.includes('disease')) renderChecklist(diseaseInd, 'di', isRtl ? '🔴 شاخص‌های بیماری' : '🔴 Disease Indicators');
+        if (activeKeys.includes('risk')) renderChecklist(riskFact, 'rf', isRtl ? '🟡 عوامل خطر' : '🟡 Risk Factors');
+        if (activeKeys.includes('protect')) renderChecklist(protFact, 'pf', isRtl ? '🟢 عوامل محافظتی' : '🟢 Protective Factors');
+
+        if (activeKeys.includes('result')) {
+            html += `<h2>${isRtl ? '📊 نتیجه نهایی' : '📊 Final Result'}</h2>`;
+            html += `<div class="score-box"><div class="score-num" style="color:${riskColors[results?.finalCat]}">${results?.score > 0 ? '+' : ''}${toFaNum(results?.score, lang)}</div>`;
+            html += `<div style="font-weight:900;font-size:20px;margin-top:8px;">${riskLabels[results?.finalCat]}</div></div>`;
+        }
+
+        if (activeKeys.includes('icdas')) {
+            html += `<h2>ICDAS</h2>`;
+            html += `<table><thead><tr><th>Code</th><th>${isRtl ? 'توضیح' : 'Description'}</th></tr></thead><tbody>`;
+            const icdasData = [
+                ['0', isRtl ? 'سطح سالم' : 'Sound surface'],
+                ['1', isRtl ? 'اولین تغییر مینا' : 'First enamel change'],
+                ['2', isRtl ? 'ضایعه واضح مینا' : 'Distinct enamel lesion'],
+                ['3', isRtl ? 'شکستگی موضعی مینا' : 'Enamel microcavity'],
+                ['4', isRtl ? 'سایه عاج' : 'Dentin shadow'],
+                ['5', isRtl ? 'حفره با عاج' : 'Cavity into dentin'],
+                ['6', isRtl ? 'حفره وسیع' : 'Extensive cavity'],
+            ];
+            icdasData.forEach(([c, d]) => { html += `<tr><td style="font-weight:900;text-align:center;">${toFaNum(c, lang)}</td><td>${d}</td></tr>`; });
+            html += `</tbody></table>`;
+        }
+
+        if (activeKeys.includes('plan')) {
+            const RecMap = {
+                lowRisk: { d: 'rec_low_diag', i: 'rec_low_int' },
+                moderateRisk: { d: 'rec_mod_diag', i: 'rec_mod_int' },
+                highRisk: { d: 'rec_high_diag', i: 'rec_high_int' },
+                extremeRisk: { d: 'rec_ext_diag', i: 'rec_ext_int' },
+            };
+            html += `<h2>${isRtl ? '📋 برنامه درمانی' : '📋 Action Plan'}</h2>`;
+            html += `<div style="margin-bottom:12px;"><strong>${t?.recDiagnostics}:</strong><div style="margin-top:8px;">${t?.[RecMap[results?.finalCat]?.d] || ''}</div></div>`;
+            html += `<div><strong>${t?.recInterventions}:</strong><div style="margin-top:8px;">${t?.[RecMap[results?.finalCat]?.i] || ''}</div></div>`;
+        }
+
+        html += `<div style="margin-top:40px;padding-top:16px;border-top:2px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:11px;">CAMBRA Clinical Assessment Tool — Generated Report</div>`;
+        html += `</body></html>`;
+
+        // Open print window
+        const printWindow = window.open('', '_blank', 'width=800,height=1000');
+        printWindow.document.write(html);
+        printWindow.document.close();
+        setTimeout(() => { printWindow.print(); }, 400);
+        onClose();
+    };
+
+    if (!open) return null;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
+            <div
+                className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl border-t-4 sm:border-4 border-slate-900 shadow-[0_-8px_30px_rgba(0,0,0,0.3)] sm:shadow-[8px_8px_0px_#0f172a] max-h-[85vh] overflow-y-auto"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between p-5 border-b border-slate-200 sticky top-0 bg-white z-10 rounded-t-3xl">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+                            <Download className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <h3 className="font-black text-lg text-slate-900">{isRtl ? 'ذخیره گزارش' : 'Export Report'}</h3>
+                            <p className="text-xs text-slate-400 font-bold">{isRtl ? 'بخش‌های مورد نظر را انتخاب کنید' : 'Select sections to include'}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center cursor-pointer active:scale-90 transition-all">
+                        <X className="w-4 h-4 text-slate-500" />
+                    </button>
+                </div>
+
+                {/* Sections Toggle */}
+                <div className="p-4 space-y-2">
+                    {sections.map((sec) => (
+                        <button
+                            key={sec.id}
+                            onClick={() => toggleSection(sec.id)}
+                            className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all duration-200 cursor-pointer active:scale-[0.98] ${sec.checked
+                                ? 'border-indigo-300 bg-indigo-50 shadow-sm'
+                                : 'border-slate-200 bg-white hover:bg-slate-50'
+                            }`}
+                        >
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${sec.checked ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                                {sec.checked ? <Check className="w-4 h-4 text-white" strokeWidth={3} /> : <div className="w-3 h-3" />}
+                            </div>
+                            <sec.icon className={`w-4 h-4 flex-shrink-0 ${sec.checked ? 'text-indigo-600' : 'text-slate-400'}`} />
+                            <span className={`font-bold text-sm ${sec.checked ? 'text-slate-900' : 'text-slate-500'}`}>{sec.label}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {/* Actions */}
+                <div className="p-4 pt-0 pb-6">
+                    <button
+                        onClick={generatePdf}
+                        disabled={!sections.some(s => s.checked)}
+                        className="group relative w-full cursor-pointer active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <div className="absolute inset-0 bg-indigo-800 rounded-2xl translate-y-1"></div>
+                        <div className="relative bg-indigo-600 text-white py-4 rounded-2xl font-black text-base flex items-center justify-center gap-3 group-hover:translate-y-0.5 transition-transform">
+                            <FileText className="w-5 h-5" />
+                            {isRtl ? 'تولید و چاپ PDF' : 'Generate & Print PDF'}
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WELCOME SCREEN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function WelcomeScreen({ lang, onStart }) {
+    const isRtl = lang === 'fa';
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 py-12 text-center">
+            <div className="relative mb-8">
+                <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center border-4 border-slate-900 shadow-[8px_8px_0px_#64748b] transition-all hover:shadow-[4px_4px_0px_#64748b] hover:translate-x-1 hover:translate-y-1">
+                    <HeartPulse className="w-12 h-12 text-white" strokeWidth={1.5} />
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-600 rounded-full border-4 border-white flex items-center justify-center animate-bounce shadow-lg">
+                    <Sparkles className="w-4 h-4 text-white" />
+                </div>
+            </div>
+
+            <h1 className="text-5xl font-black tracking-tighter text-slate-900 leading-none mb-1">CAMBRA</h1>
+            <p className="text-sm font-black uppercase tracking-[0.3em] bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent mt-1">
+                {isRtl ? 'ابزار ارزیابی ریسک پوسیدگی' : 'Caries Risk Assessment Tool'}
+            </p>
+
+            <div className="max-w-md w-full bg-white border-4 border-slate-900 rounded-[2rem] shadow-[8px_8px_0px_#0f172a] p-6 my-8 text-start">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-9 h-9 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl flex items-center justify-center flex-shrink-0 border border-indigo-200">
+                        <BookOpen className="w-4 h-4 text-indigo-700" />
+                    </div>
+                    <h2 className="font-black text-slate-900 text-base">
+                        {isRtl ? 'این ابزار چیست؟' : 'What is this tool?'}
+                    </h2>
+                </div>
+                <p className="text-sm text-slate-600 font-medium leading-relaxed mb-4">
+                    {isRtl
+                        ? 'CAMBRA یک پروتکل بالینی مبتنی بر شواهد برای ارزیابی ریسک پوسیدگی دندان در بیماران بالای ۶ سال است. با تحلیل شاخص‌ها، عوامل خطر و عوامل محافظتی، سطح خطر و برنامه درمانی ارائه می‌دهد.'
+                        : 'CAMBRA is an evidence-based clinical protocol for assessing dental caries risk in patients aged 6+. It analyzes disease indicators, risk factors, and protective factors to determine risk level and treatment plan.'}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                    {[
+                        { label: isRtl ? 'شاخص بیماری' : 'Disease', color: 'bg-gradient-to-br from-red-50 to-red-100 text-red-700 border-red-200' },
+                        { label: isRtl ? 'عوامل خطر' : 'Risk', color: 'bg-gradient-to-br from-amber-50 to-amber-100 text-amber-700 border-amber-200' },
+                        { label: isRtl ? 'محافظت' : 'Protect', color: 'bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700 border-emerald-200' },
+                    ].map(item => (
+                        <div key={item.label} className={`text-center text-[11px] font-black py-2 px-2 rounded-xl border-2 ${item.color}`}>
+                            {item.label}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="max-w-md w-full mb-8 text-start space-y-2">
+                {(isRtl ? [
+                    'اطلاعات بیمار را وارد کنید',
+                    'شاخص‌ها و عوامل خطر را بررسی کنید',
+                    'عوامل محافظتی را ثبت کنید',
+                    'نتیجه و برنامه درمانی دریافت کنید',
+                ] : [
+                    'Enter patient information',
+                    'Evaluate disease and risk factors',
+                    'Record protective factors',
+                    'Receive risk level and action plan',
+                ]).map((step, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-white border-2 border-slate-200 rounded-2xl px-4 py-3 hover:border-slate-300 hover:shadow-md transition-all duration-200 cursor-default">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-800 to-slate-900 text-white flex items-center justify-center text-xs font-black flex-shrink-0 shadow-sm">
+                            {toFaNum(i + 1, isRtl ? 'fa' : 'en')}
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">{step}</span>
+                    </div>
+                ))}
+            </div>
+
+            <button onClick={onStart} className="group relative cursor-pointer active:scale-95 transition-transform">
+                <div className="absolute inset-0 bg-indigo-800 rounded-2xl translate-x-1 translate-y-2"></div>
+                <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-4 border-slate-900 px-10 py-4 rounded-2xl font-black text-lg flex items-center gap-3 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform shadow-xl">
+                    <Sparkles className="w-5 h-5" />
+                    {isRtl ? 'شروع ارزیابی' : 'Start Assessment'}
+                    <ChevronRight className={`w-5 h-5 ${isRtl ? 'rotate-180' : ''}`} />
+                </div>
+            </button>
+
+            <p className="mt-6 text-[11px] text-slate-400 font-bold uppercase tracking-widest">
+                {isRtl ? 'ویژه بیماران ۶ سال و بالاتر' : 'For patients aged 6 and above'}
+            </p>
+        </div>
+    );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const ADMIN_KEY = 'cambra_admin_2026';
+const CHART_PREFIX = 'CMB';
+
+export default function CambraApp() {
+    const [lang, setLang] = useState('fa');
+    const [activeTab, setActiveTab] = useState('welcome');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [config, setConfig] = useState(null);
+    const [showPdfModal, setShowPdfModal] = useState(false);
+
+    // Check admin from URL params
+    const isAdmin = useMemo(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('admin') === ADMIN_KEY;
+        }
+        return false;
+    }, []);
+
+    // Generate initial date based on lang
+    const getInitialDate = (l) => {
+        const d = new Date();
+        if (l === 'fa') {
+            const j = gregorianToJalali(d.getFullYear(), d.getMonth()+1, d.getDate());
+            return dateToString(j.jy, j.jm, j.jd);
+        }
+        return dateToString(d.getFullYear(), d.getMonth()+1, d.getDate());
+    };
+
+    const [patient, setPatient] = useState({
+        name: '', chartNo: '', date: getInitialDate('fa'), assessmentType: 'baseline'
+    });
+    const [diseaseInd, setDiseaseInd] = useState([]);
+    const [riskFact, setRiskFact] = useState([]);
+    const [protFact, setProtFact] = useState([]);
+    const [appAlert, setAppAlert] = useState({ show: false, message: '', type: 'info', onClose: null });
+
+    // When language changes, convert the date
+    useEffect(() => {
+        setPatient(prev => {
+            if (!prev.date) return prev;
+            const [y, m, d] = prev.date.split('-').map(Number);
+            if (lang === 'fa') {
+                // was gregorian, convert to jalali
+                if (y > 1500) {
+                    const j = gregorianToJalali(y, m, d);
+                    return { ...prev, date: dateToString(j.jy, j.jm, j.jd) };
+                }
+            } else {
+                // was jalali, convert to gregorian
+                if (y < 1500) {
+                    const g = jalaliToGregorian(y, m, d);
+                    return { ...prev, date: dateToString(g.gy, g.gm, g.gd) };
+                }
+            }
+            return prev;
+        });
+    }, [lang]);
+
+    useEffect(() => {
+        fetch('https://attendance.rlh.ir/appliance_survey/api/cambra/config')
+            .then(res => res.json())
+            .then(data => {
+                setConfig(data);
+                const s = data.settings;
+                setDiseaseInd(new Array(s.diseaseCount).fill(false));
+                setRiskFact(new Array(s.riskCount).fill(false));
+                setProtFact(new Array(s.protectiveCount).fill(false));
+            })
+            .catch(err => console.error(err));
+    }, []);
+
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [activeTab]);
+
+    const results = useMemo(() => {
+        if (!config) return null;
+        const s = config.settings;
+        const dCount = diseaseInd.filter(Boolean).length;
+        const rCount = riskFact.filter(Boolean).length;
+        const pCount = protFact.filter(Boolean).length;
+        const dScore = dCount * s.diseaseWeight;
+        const rScore = rCount * s.riskWeight;
+        const pScore = pCount * s.protectiveWeight;
+        const score = (dScore + rScore) - pScore;
+
+        let base = 'lowRisk';
+        if (score >= s.extremeMin) base = 'extremeRisk';
+        else if (score >= s.modMax + 1) base = 'highRisk';
+        else if (score >= s.lowMax + 1) base = 'moderateRisk';
+
+        let finalCat = base;
+        let dOverride = false, eOverride = false, orthoOverride = false;
+
+        if (riskFact[7] && base === 'lowRisk') { finalCat = 'moderateRisk'; orthoOverride = true; }
+        if (dCount > 0 && (finalCat === 'lowRisk' || finalCat === 'moderateRisk')) {
+            finalCat = 'highRisk'; dOverride = true; orthoOverride = false;
+        }
+        const hasHyposalivation = riskFact[1] || riskFact[4];
+        if (finalCat === 'highRisk' && hasHyposalivation) {
+            finalCat = 'extremeRisk'; eOverride = true; dOverride = false;
+        }
+        return { dCount, rCount, pCount, dScore, rScore, pScore, score, finalCat, dOverride, eOverride, orthoOverride, hasHyposalivation };
+    }, [diseaseInd, riskFact, protFact, config]);
+
+    const tabOrder = ['welcome', 'patient', 'disease', 'protective', 'results'];
+
+    const isTabValid = (id) => {
+        if (id === 'patient') return patient.name.length > 0 && patient.chartNo.length > 0;
+        return true;
+    };
+
+    const toggleItem = (setter, idx) => {
+        setter(prev => { const n = [...prev]; n[idx] = !n[idx]; return n; });
+    };
+
+    const generateChartNo = () => {
+        const rand = Math.floor(1000 + Math.random() * 9000);
+        const now = new Date();
+        const yy = String(now.getFullYear()).slice(-2);
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        setPatient(p => ({ ...p, chartNo: `${CHART_PREFIX}-${yy}${mm}-${rand}` }));
+    };
+
+    const resetForm = () => {
+        setPatient({ name: '', chartNo: '', date: getInitialDate(lang), assessmentType: 'baseline' });
+        if (config) {
+            const s = config.settings;
+            setDiseaseInd(new Array(s.diseaseCount).fill(false));
+            setRiskFact(new Array(s.riskCount).fill(false));
+            setProtFact(new Array(s.protectiveCount).fill(false));
+        }
+        setActiveTab('welcome');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const submitToServer = async () => {
+        setIsSubmitting(true);
+        try {
+            const currentDict = config.dict[lang];
+            const getCheckedLabels = (arr, prefix) =>
+                arr.map((v, i) => v ? currentDict[`${prefix}_${i + 1}`] : null).filter(Boolean);
+
+            // Convert date to gregorian for storage
+            let storedDate = patient.date;
+            if (lang === 'fa' && patient.date) {
+                const [y, m, d] = patient.date.split('-').map(Number);
+                if (y < 1500) {
+                    const g = jalaliToGregorian(y, m, d);
+                    storedDate = dateToString(g.gy, g.gm, g.gd);
+                }
+            }
+
+            const payload = {
+                patient_name: patient.name,
+                chart_no: patient.chartNo,
+                assessment_type: patient.assessmentType,
+                disease_ind: JSON.stringify(getCheckedLabels(diseaseInd, 'di')),
+                risk_fact: JSON.stringify(getCheckedLabels(riskFact, 'rf')),
+                prot_fact: JSON.stringify(getCheckedLabels(protFact, 'pf')),
+                severe_hypo: results.hasHyposalivation.toString(),
+                net_score: results.score,
+                final_category: results.finalCat,
+                raw_data: JSON.stringify({ patient: { ...patient, date: storedDate }, diseaseInd, riskFact, protFact })
+            };
+
+            const response = await fetch('https://attendance.rlh.ir/appliance_survey/api/cambra/submit', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                setAppAlert({ show: true, message: lang === 'fa' ? 'با موفقیت ثبت شد!' : 'Submitted successfully!', type: 'success', onClose: resetForm });
+            } else {
+                setAppAlert({ show: true, message: lang === 'fa' ? 'خطا در ثبت اطلاعات.' : 'Error submitting data.', type: 'error' });
+            }
+        } catch {
+            setAppAlert({ show: true, message: lang === 'fa' ? 'اینترنت خود را بررسی کنید.' : 'Check your internet connection.', type: 'error' });
+        }
+        setIsSubmitting(false);
+    };
+
+    // ──────────────────────────────────────────────────────────────────────────
+    if (!config) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-slate-500 bg-slate-50">
+                <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                <span className="font-bold text-sm animate-pulse">Loading...</span>
+            </div>
+        );
+    }
+
+    const t = config.dict[lang];
+    const isRtl = lang === 'fa';
+    const settings = config.settings;
+    const isWelcome = activeTab === 'welcome';
+
+    const headerTabs = [
+        { id: 'patient',    icon: User,        label: t.tabPatient },
+        { id: 'disease',    icon: AlertCircle, label: t.tabDisease },
+        { id: 'protective', icon: Shield,      label: t.tabProtective },
+        { id: 'results',    icon: PieChart,    label: t.tabResults },
+    ];
+
+    const CatColors = {
+        extremeRisk:  'bg-gradient-to-br from-red-800 to-red-950',
+        highRisk:     'bg-gradient-to-br from-red-500 to-red-700',
+        moderateRisk: 'bg-gradient-to-br from-amber-400 to-orange-500',
+        lowRisk:      'bg-gradient-to-br from-emerald-500 to-teal-600',
+    };
+
+    const CatGlows = {
+        extremeRisk: 'shadow-red-900/50',
+        highRisk:    'shadow-red-500/30',
+        moderateRisk:'shadow-amber-400/30',
+        lowRisk:     'shadow-emerald-500/30',
+    };
+
+    const RecMap = {
+        lowRisk:      { d: 'rec_low_diag',  i: 'rec_low_int'  },
+        moderateRisk: { d: 'rec_mod_diag',  i: 'rec_mod_int'  },
+        highRisk:     { d: 'rec_high_diag', i: 'rec_high_int' },
+        extremeRisk:  { d: 'rec_ext_diag',  i: 'rec_ext_int'  },
+    };
+
+    // Full clinical descriptions
+    const fullHints = {
+        fa: {
+            di_1: 'وجود پوسیدگی جدید یا ضایعه‌ای که بر اساس معاینه بالینی یا تصاویر رادیوگرافی به عاج رسیده باشد. هر ضایعه جدیدی که از مرز مینا عبور کرده و وارد عاج شده باشد، حتی اگر حفره واضحی ایجاد نکرده باشد.',
+            di_2: 'ضایعات سفید گچی جدید روی سطوح صاف که نشان‌دهنده دمینرالیزاسیون اولیه مینا هستند. معمولاً پس از خشک کردن واضح‌تر دیده می‌شوند.',
+            di_3: 'ضایعات جدید محدود به مینا در رادیوگرافی که هنوز وارد عاج نشده‌اند. هر رادیولوسنسی محدود به مینا پاسخ مثبت است.',
+            di_4: 'ترمیم‌های ناشی از پوسیدگی. بیمار جدید: ۳ سال اخیر. بیمار ثبت‌شده: ۱ سال اخیر. ترمیم‌های زیبایی یا تروما لحاظ نمی‌شوند.',
+            rf_1: 'مصرف بیش از ۳ نوبت میان‌وعده کربوهیدراتی در روز. دفعات مصرف مهم‌تر از مقدار است.',
+            rf_2: 'داروهای کاهنده بزاق شامل ضدافسردگی، آنتی‌هیستامین، ضدروان‌پریشی، ضداضطراب و برخی ضد فشارخون.',
+            rf_3: 'مواد مخدر غیرپزشکی شامل مت‌آمفتامین، حشیش، کوکائین و اپیوئیدها که بزاق را کاهش می‌دهند.',
+            rf_4: 'تجمع واضح پلاک میکروبی قابل مشاهده با چشم یا محلول آشکارساز.',
+            rf_5: 'جریان بزاق بدون تحریک کمتر از ۰.۱ یا تحریک‌شده کمتر از ۰.۷ mL/min.',
+            rf_6: 'شیارهای عمیق و باریک سطوح جونده که قابل تمیز شدن نیستند.',
+            rf_7: 'نمایان شدن ریشه دندان در اثر تحلیل لثه یا از دست رفتن اتصال پریودنتال.',
+            rf_8: 'وسایل ارتودنسی ثابت (براکت، بند، تیوب). الاینر شفاف معمولاً شامل نمی‌شود.',
+            pf_1: 'آب آشامیدنی حاوی فلوراید (حدود ۰.۷ ppm). ساکنین شهرهای دارای فلوراید طبیعی (ماکو، بوشهر، کاشان و...) مثبت هستند.',
+            pf_2: 'مسواک با خمیردندان فلورایددار (۱۰۰۰–۱۴۵۰ ppm) حداقل یک بار در روز.',
+            pf_3: 'مسواک با خمیردندان فلوراید حداقل ۲ بار در روز.',
+            pf_4: 'خمیردندان تجویزی ۵۰۰۰ ppm فلوراید برای افراد پرخطر.',
+            pf_5: 'حداقل یک نوبت وارنیش فلوراید ۵٪ سدیم فلوراید در ۶ ماه گذشته.',
+            pf_6: 'دهان‌شویه ۰.۰۵٪ سدیم فلوراید به صورت روزانه.',
+            pf_7: 'دهان‌شویه کلرهگزیدین ۰.۱۲٪ روزانه به مدت ۷ روز در ماه.',
+            pf_8: 'عملکرد طبیعی بزاق بدون علائم خشکی دهان.',
+        },
+        en: {
+            di_1: 'New caries or lesions reaching dentin on clinical/radiographic examination. Any lesion past the DEJ is positive.',
+            di_2: 'New white spot lesions on smooth surfaces indicating early enamel demineralization.',
+            di_3: 'New radiographic lesions confined to enamel without cavitation.',
+            di_4: 'Restorations due to caries. New patient: past 3 years. Established: past 1 year. Excludes esthetic/trauma.',
+            rf_1: 'More than 3 snacking episodes with fermentable carbohydrates daily. Frequency matters more than quantity.',
+            rf_2: 'Medications causing xerostomia: antidepressants, antihistamines, antipsychotics, anxiolytics, antihypertensives.',
+            rf_3: 'Recreational drugs (methamphetamine, cannabis, cocaine, opioids) reducing salivary flow.',
+            rf_4: 'Clinically visible plaque accumulation on tooth surfaces.',
+            rf_5: 'Unstimulated flow < 0.1 mL/min or stimulated flow < 0.7 mL/min.',
+            rf_6: 'Deep narrow pits and fissures on occlusal surfaces prone to plaque retention.',
+            rf_7: 'Exposed root surfaces from gingival recession or periodontal attachment loss.',
+            rf_8: 'Fixed orthodontic appliances (brackets, bands, tubes). Clear aligners generally excluded.',
+            pf_1: 'Regular consumption of fluoridated water at ~0.7 ppm from community or other sources.',
+            pf_2: 'Daily brushing at least once with fluoride toothpaste (1,000–1,450 ppm).',
+            pf_3: 'Brushing with fluoride toothpaste at least twice daily.',
+            pf_4: 'Regular use of prescription 5,000 ppm fluoride toothpaste for high-risk patients.',
+            pf_5: 'At least one professional fluoride varnish (5% NaF) in the past 6 months.',
+            pf_6: 'Daily 0.05% sodium fluoride mouthrinse.',
+            pf_7: '0.12% chlorhexidine gluconate mouthrinse daily for 7 consecutive days each month.',
+            pf_8: 'Normal salivary gland function with no xerostomia symptoms.',
+        }
+    };
+
+    // ── DataRow ────────────────────────────────────────────────────────────────
+    const DataRow = ({ label, shortHint, fullHintText, checked, onChange, idx, color, weightTag }) => {
+        const activeColors = { red: 'bg-gradient-to-r from-red-500 to-rose-600', amber: 'bg-gradient-to-r from-amber-400 to-orange-500', emerald: 'bg-gradient-to-r from-emerald-400 to-teal-500' };
+        const hoverColors  = { red: 'hover:bg-red-50/50', amber: 'hover:bg-amber-50/50', emerald: 'hover:bg-emerald-50/50' };
+
+        return (
+            <div
+                className={`flex flex-col py-4 px-5 border-b border-slate-100 transition-all duration-200 cursor-pointer select-none active:bg-slate-100 ${checked ? 'bg-slate-50/80' : `bg-white ${hoverColors[color]}`}`}
+                onClick={() => onChange(idx)}
+            >
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className={`flex-shrink-0 w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all duration-300 ${checked ? `${activeColors[color]} border-transparent shadow-lg` : 'border-slate-300 bg-white'}`}>
+                            <Check className={`w-4 h-4 text-white transition-all duration-300 ${checked ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`} strokeWidth={3} />
+                        </div>
+                        <span className={`text-[15px] font-bold transition-colors duration-200 leading-snug ${checked ? 'text-slate-900' : 'text-slate-600'}`}>
+                            {label}
+                        </span>
+                    </div>
+                    <div className={`transition-all duration-500 ${checked ? 'opacity-100 scale-100' : 'opacity-0 scale-0'}`}>
+                        <ScoreBadge value={parseInt(weightTag.replace(/[^0-9]/g,''))} sign={weightTag[0]} color={color} lang={lang} />
+                    </div>
+                </div>
+                <InfoDrawer shortHint={shortHint} fullText={fullHintText} color={color} />
+            </div>
+        );
+    };
+
+    return (
+        <div dir={isRtl ? 'rtl' : 'ltr'} className={`min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-900 font-sans pb-24 print:pb-0 ${isRtl ? 'font-arabic' : ''}`}>
+
+            {/* ═══ HEADER ═══ */}
+            <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/80 px-4 sm:px-6 py-3 sticky top-0 z-30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-gradient-to-br from-slate-800 to-slate-950 text-white rounded-xl flex items-center justify-center shadow-md">
+                        <Activity className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                        <h1 className="font-black text-base sm:text-lg text-slate-900 leading-tight">{t.title}</h1>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">{t.subtitle}</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    {isAdmin && (
+                        <a
+                            href="/appliance_survey/admin-cambra-789"
+                            target="_blank"
+                            className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 hover:from-indigo-200 hover:to-purple-200 flex items-center justify-center cursor-pointer active:scale-90 transition-all border border-indigo-200"
+                        >
+                            <Settings className="w-4 h-4 text-indigo-700" />
+                        </a>
+                    )}
+                    <button
+                        onClick={() => setLang(lang === 'en' ? 'fa' : 'en')}
+                        className="h-9 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold flex-shrink-0 cursor-pointer active:scale-95 transition-all border border-slate-200"
+                    >
+                        {t.language}
+                    </button>
+                </div>
+            </header>
+
+            {/* ═══ TAB BAR ═══ */}
+            {!isWelcome && (
+                <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/80 sticky top-[57px] z-20">
+                    <div className="max-w-3xl mx-auto flex">
+                        {headerTabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex-1 flex flex-col items-center gap-1 py-2.5 px-2 text-[11px] font-bold border-b-2 transition-all cursor-pointer
+                                    ${activeTab === tab.id
+                                        ? 'border-slate-900 text-slate-900'
+                                        : 'border-transparent text-slate-400 hover:text-slate-600'
+                                    }`}
+                            >
+                                <tab.icon className={`w-4 h-4 transition-colors ${activeTab === tab.id ? 'text-slate-900' : 'text-slate-300'}`} />
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ═══ MAIN ═══ */}
+            <main className="max-w-3xl mx-auto p-4 md:p-8">
+
+                {isWelcome && <WelcomeScreen lang={lang} onStart={() => setActiveTab('patient')} />}
+
+                <div className={isWelcome ? 'hidden' : 'space-y-8'}>
+
+                    {/* ── PATIENT ── */}
+                    <div className={activeTab !== 'patient' ? 'hidden print:block' : ''}>
+                        <div className="bg-white rounded-3xl border-2 border-slate-200 overflow-visible shadow-sm">
+                            <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-6 py-1 border-b border-slate-200">
+                                <h2 className="text-sm font-bold text-slate-700 uppercase tracking-widest">{t.patientInfo}</h2>
+                            </div>
+                            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                {/* Name */}
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t.patientName}</label>
+                                    <div className="relative">
+                                        <div className="absolute top-1/2 -translate-y-1/2 start-3 w-9 h-9 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+                                            <User className="w-4 h-4 text-slate-500" />
+                                        </div>
+                                        <input
+                                            type="text" value={patient.name}
+                                            onChange={e => setPatient(p => ({ ...p, name: e.target.value }))}
+                                            className="w-full text-base font-bold ps-14 pe-4 py-3 border-2 border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:shadow-lg focus:shadow-indigo-100 transition-all duration-200"
+                                            placeholder={isRtl ? 'نام بیمار...' : 'Patient name...'}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Chart No with random generator */}
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t.chartNo}</label>
+                                    <div className="relative">
+                                        <div className="absolute top-1/2 -translate-y-1/2 start-3 w-9 h-9 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+                                            <ClipboardCheck className="w-4 h-4 text-slate-500" />
+                                        </div>
+                                        <input
+                                            type="text" value={toFaNumStr(patient.chartNo, lang)}
+                                            onChange={e => {
+                                                // Allow typing raw but show persian
+                                                let val = e.target.value;
+                                                if (isRtl) {
+                                                    val = val.replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 1728 + 48));
+                                                }
+                                                setPatient(p => ({ ...p, chartNo: val }));
+                                            }}
+                                            className="w-full text-base font-bold ps-14 pe-14 py-3 border-2 border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:shadow-lg focus:shadow-indigo-100 transition-all duration-200 font-mono"
+                                            placeholder={isRtl ? 'شماره پرونده...' : 'Chart number...'}
+                                        />
+                                        <button
+                                            onClick={generateChartNo}
+                                            type="button"
+                                            className="absolute top-1/2 -translate-y-1/2 end-2 w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center cursor-pointer active:scale-90 transition-all shadow-md hover:shadow-lg hover:shadow-indigo-200"
+                                            title={isRtl ? 'تولید خودکار' : 'Generate'}
+                                        >
+                                            <Shuffle className="w-4 h-4 text-white" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Date - Custom Calendar */}
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t.date}</label>
+                                    <CalendarPicker
+                                        value={patient.date}
+                                        onChange={val => setPatient(p => ({ ...p, date: val }))}
+                                        lang={lang}
+                                    />
+                                </div>
+
+                                {/* Assessment Type - Custom Select */}
+                                <div className="flex flex-col gap-2">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t.assessmentType}</label>
+                                    <CustomSelect
+                                        value={patient.assessmentType}
+                                        onChange={val => setPatient(p => ({ ...p, assessmentType: val }))}
+                                        options={[
+                                            { value: 'baseline', label: t.baseline, desc: isRtl ? 'اولین ارزیابی بیمار' : 'First patient assessment' },
+                                            { value: 'recall', label: t.recall, desc: isRtl ? 'ارزیابی پیگیری دوره‌ای' : 'Periodic follow-up assessment' },
+                                        ]}
+                                        placeholder={isRtl ? 'انتخاب نوع...' : 'Select type...'}
+                                        lang={lang}
+                                        icon={ClipboardCheck}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── DISEASE / RISK ── */}
+                    <div className={`${activeTab !== 'disease' ? 'hidden print:block' : ''} space-y-8`}>
+                        <div className="bg-white rounded-3xl border-2 border-slate-200 overflow-hidden shadow-sm">
+                            <div className="bg-gradient-to-r from-red-50 to-rose-50 border-b border-red-100 px-6 py-4">
+                                <h2 className="text-sm font-black text-red-800 uppercase tracking-widest">{t.diseaseIndicators}</h2>
+                                <p className="text-xs text-red-500 mt-1 font-bold">{t.diseaseIndSubtitle}</p>
+                            </div>
+                            <div>
+                                {Array.from({ length: settings.diseaseCount }).map((_, idx) => (
+                                    <DataRow key={`di_${idx}`} label={t[`di_${idx+1}`]} shortHint={t[`di_${idx+1}_hint`]}
+                                        fullHintText={fullHints[lang][`di_${idx+1}`]}
+                                        checked={diseaseInd[idx]} onChange={i => toggleItem(setDiseaseInd, i)}
+                                        idx={idx} color="red" weightTag={`+${settings.diseaseWeight}`} />
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-3xl border-2 border-slate-200 overflow-hidden shadow-sm">
+                            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100 px-6 py-4">
+                                <h2 className="text-sm font-black text-amber-800 uppercase tracking-widest">{t.riskFactors}</h2>
+                                <p className="text-xs text-amber-600 mt-1 font-bold">{t.riskFactSubtitle}</p>
+                            </div>
+                            <div>
+                                {Array.from({ length: settings.riskCount }).map((_, idx) => (
+                                    <DataRow key={`rf_${idx}`} label={t[`rf_${idx+1}`]} shortHint={t[`rf_${idx+1}_hint`]}
+                                        fullHintText={fullHints[lang][`rf_${idx+1}`]}
+                                        checked={riskFact[idx]} onChange={i => toggleItem(setRiskFact, i)}
+                                        idx={idx} color="amber" weightTag={`+${settings.riskWeight}`} />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── PROTECTIVE ── */}
+                    <div className={`${activeTab !== 'protective' ? 'hidden print:block' : ''} space-y-8`}>
+                        <div className="bg-white rounded-3xl border-2 border-slate-200 overflow-hidden shadow-sm">
+                            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 px-6 py-4">
+                                <h2 className="text-sm font-black text-emerald-800 uppercase tracking-widest">{t.protectiveFactors}</h2>
+                                <p className="text-xs text-emerald-600 mt-1 font-bold">{t.protFactSubtitle}</p>
+                            </div>
+                            <div>
+                                {Array.from({ length: settings.protectiveCount }).map((_, idx) => (
+                                    <DataRow key={`pf_${idx}`} label={t[`pf_${idx+1}`]} shortHint={t[`pf_${idx+1}_hint`]}
+                                        fullHintText={fullHints[lang][`pf_${idx+1}`]}
+                                        checked={protFact[idx]} onChange={i => toggleItem(setProtFact, i)}
+                                        idx={idx} color="emerald" weightTag={`-${settings.protectiveWeight}`} />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── RESULTS ── */}
+                    <div className={`${activeTab !== 'results' ? 'hidden' : 'block'} space-y-6 pb-20`}>
+
+                        {/* Status Stamp */}
+                        <div className="relative group w-full mb-10">
+                            <div className={`relative w-full rounded-[2rem] border-4 border-slate-900 shadow-[12px_12px_0px_#0f172a] hover:shadow-[4px_4px_0px_#0f172a] hover:translate-x-2 hover:translate-y-2 transition-all duration-300 flex flex-col md:flex-row overflow-hidden bg-white`}>
+                                <div className={`relative flex-1 p-8 md:p-12 flex flex-col justify-center overflow-hidden ${CatColors[results.finalCat]}`}>
+                                    <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.3) 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+                                    <Shield className="absolute -right-16 -bottom-16 w-72 h-72 opacity-[0.07] text-white rotate-12 pointer-events-none" strokeWidth={1} />
+                                    {(results.finalCat === 'extremeRisk' || results.finalCat === 'highRisk') && (
+                                        <div className="absolute top-0 left-0 w-full h-2 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 10px, transparent 10px, transparent 20px)' }}></div>
+                                    )}
+                                    <div className="relative z-10">
+                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/15 border border-white/25 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-white/90 mb-6 backdrop-blur-sm">
+                                            <Activity className="w-3 h-3" />
+                                            {isRtl ? 'نتیجه آنالیز' : 'ALGORITHM VERDICT'}
+                                        </div>
+                                        <h2 className="text-5xl sm:text-6xl font-black uppercase tracking-tighter leading-[0.85] text-white drop-shadow-[4px_4px_0px_rgba(0,0,0,0.3)]">
+                                            {t[results.finalCat]}
+                                        </h2>
+                                    </div>
+                                </div>
+
+                                <div className="w-full md:w-[280px] bg-slate-900 text-white p-6 sm:p-8 flex flex-col justify-between border-t-4 md:border-t-0 md:border-l-4 border-slate-800 relative">
+                                    <div className="absolute inset-2 border border-slate-700/30 rounded-2xl pointer-events-none"></div>
+                                    <div className="relative z-10 mb-6">
+                                        <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse"></div>
+                                            {isRtl ? 'نمره خالص' : 'NET SCORE'}
+                                        </span>
+                                        <div className="flex items-end gap-2 mt-3" dir="ltr">
+                                            <span className={`text-6xl font-black font-mono leading-none tracking-tighter ${CatGlows[results.finalCat]} drop-shadow-2xl`}>
+                                                {results.score > 0 ? '+' : ''}{toFaNum(results.score, lang)}
+                                            </span>
+                                            <span className="text-xs font-bold text-slate-500 mb-2 uppercase">pts</span>
+                                        </div>
+                                        {patient.date && (
+                                            <div className="mt-3 flex items-center gap-1.5 text-slate-500 text-[11px] font-bold" dir={isRtl ? 'rtl' : 'ltr'}>
+                                                <Calendar className="w-3 h-3 flex-shrink-0" />
+                                                <span>
+                                                    {(() => {
+                                                        const [y,m,d] = patient.date.split('-').map(Number);
+                                                        if (isRtl) return `${toFaNum(d,'fa')} ${JALALI_MONTHS[m-1]} ${toFaNum(y,'fa')}`;
+                                                        return `${GREGORIAN_MONTHS[m-1]} ${d}, ${y}`;
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="relative z-10">
+                                        {results.hasHyposalivation ? (
+                                            <div className="bg-gradient-to-r from-red-500 to-rose-600 text-white border-2 border-red-300/50 p-3 rounded-2xl shadow-lg shadow-red-500/30">
+                                                <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest mb-1 opacity-80">
+                                                    <Droplets className="w-3 h-3" /> {isRtl ? 'پرچم بحرانی' : 'CRITICAL FLAG'}
+                                                </span>
+                                                <span className="font-bold text-sm leading-tight block">{isRtl ? 'نقص شدید بزاق' : 'HYPOSALIVATION'}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-slate-800/80 text-slate-500 border border-slate-700 p-3 rounded-2xl border-dashed">
+                                                <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest mb-1 opacity-50">
+                                                    <Droplets className="w-3 h-3" /> {isRtl ? 'وضعیت' : 'STATUS'}
+                                                </span>
+                                                <span className="font-bold text-sm leading-tight block opacity-50">{isRtl ? 'بزاق نرمال' : 'NORMAL FLOW'}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Score cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            {[
+                                { key: 'di', score: results.dScore, sign: '+', themeMain: 'bg-gradient-to-br from-red-500 to-rose-600', themeLight: 'bg-red-50', themeBorder: 'border-red-200', themeText: 'text-red-800', label: isRtl ? 'پاتولوژی' : 'PATHOLOGY', icon: Stethoscope, items: diseaseInd.map((c,i) => c ? t[`di_${i+1}`] : null).filter(Boolean) },
+                                { key: 'rf', score: results.rScore, sign: '+', themeMain: 'bg-gradient-to-br from-amber-400 to-orange-500', themeLight: 'bg-amber-50', themeBorder: 'border-amber-200', themeText: 'text-amber-800', label: isRtl ? 'بیولوژی' : 'BIOLOGY', icon: Zap, items: riskFact.map((c,i) => c ? t[`rf_${i+1}`] : null).filter(Boolean) },
+                                { key: 'pf', score: results.pScore, sign: '-', themeMain: 'bg-gradient-to-br from-emerald-400 to-teal-500', themeLight: 'bg-emerald-50', themeBorder: 'border-emerald-200', themeText: 'text-emerald-800', label: isRtl ? 'محافظت' : 'PROTECTION', icon: ShieldCheck, items: protFact.map((c,i) => c ? t[`pf_${i+1}`] : null).filter(Boolean) },
+                            ].map((stat) => (
+                                <div key={stat.key} className="group flex flex-col bg-white rounded-3xl border-2 border-slate-200 shadow-sm hover:shadow-xl hover:border-slate-300 transition-all duration-300 overflow-hidden">
+                                    <div className="relative p-5 flex justify-between items-start">
+                                        <div className="flex flex-col gap-2.5">
+                                            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-white ${stat.themeMain} shadow-lg`}>
+                                                <stat.icon className="w-5 h-5" />
+                                            </div>
+                                            <h3 className="font-black text-xs text-slate-700 uppercase tracking-widest">{stat.label}</h3>
+                                        </div>
+                                        <div dir="ltr" className={`px-3 py-2 rounded-2xl border-2 ${stat.themeBorder} ${stat.themeLight}`}>
+                                            <span className={`font-mono font-black text-2xl leading-none ${stat.themeText}`}>
+                                                {stat.sign}{toFaNum(stat.score, lang)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="px-5 pb-5 flex-1">
+                                        {stat.items.length > 0 ? (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {stat.items.map((item, idx) => (
+                                                    <div key={idx} className={`inline-flex items-start gap-1.5 px-2 py-1 rounded-xl border ${stat.themeBorder} ${stat.themeLight}`}>
+                                                        <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${stat.themeMain}`}></div>
+                                                        <span className={`text-[11px] font-bold leading-snug ${stat.themeText}`}>{item}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center gap-2 opacity-25 py-5">
+                                                <span className="font-mono font-black text-2xl">—</span>
+                                                <span className="text-[10px] font-black uppercase tracking-widest">{isRtl ? 'موردی یافت نشد' : 'NONE'}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* ICDAS + C-grade */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
+                                <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white px-4 py-2.5 flex items-center gap-2">
+                                    <span className="font-black text-xs uppercase tracking-widest">ICDAS</span>
+                                    <span className="text-slate-400 text-[10px] font-bold">{isRtl ? 'راهنما' : 'Guide'}</span>
+                                </div>
+                                <div className="divide-y divide-slate-50">
+                                    {[
+                                        { code: '0', fa: 'سطح سالم', en: 'Sound surface' },
+                                        { code: '1', fa: 'اولین تغییر مینا', en: 'First enamel change' },
+                                        { code: '2', fa: 'ضایعه واضح مینا', en: 'Distinct enamel lesion' },
+                                        { code: '3', fa: 'شکستگی مینا', en: 'Enamel microcavity' },
+                                        { code: '4', fa: 'سایه عاج', en: 'Dentin shadow' },
+                                        { code: '5', fa: 'حفره عاج', en: 'Dentin cavity' },
+                                        { code: '6', fa: 'حفره وسیع', en: 'Extensive cavity' },
+                                    ].map(row => (
+                                        <div key={row.code} className="flex items-center gap-3 px-4 py-2">
+                                            <span className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center font-black text-xs flex-shrink-0">{toFaNum(row.code, lang)}</span>
+                                            <span className="text-xs font-bold text-slate-600">{isRtl ? row.fa : row.en}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
+                                <div className="bg-gradient-to-r from-indigo-600 to-purple-700 text-white px-4 py-2.5 flex items-center gap-2">
+                                    <span className="font-black text-xs uppercase tracking-widest">{isRtl ? 'پروگزیمال' : 'Proximal'}</span>
+                                    <span className="text-indigo-200 text-[10px] font-bold">C1 – C4</span>
+                                </div>
+                                <div className="divide-y divide-slate-50">
+                                    {[
+                                        { code: 'C1', fa: 'نیمه خارجی مینا', en: 'Outer half of enamel' },
+                                        { code: 'C2', fa: 'نیمه داخلی مینا', en: 'Inner half of enamel' },
+                                        { code: 'C3', fa: 'یک‌سوم خارجی عاج', en: 'Outer third of dentin' },
+                                        { code: 'C4', fa: 'یک‌سوم میانی/داخلی عاج', en: 'Middle/inner dentin' },
+                                    ].map(row => (
+                                        <div key={row.code} className="flex items-center gap-3 px-4 py-3">
+                                            <span className="w-10 h-8 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-xs flex-shrink-0 shadow-sm">{row.code}</span>
+                                            <span className="text-sm font-bold text-slate-700">{isRtl ? row.fa : row.en}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Overrides */}
+                        {(results.dOverride || results.eOverride || results.orthoOverride) && (
+                            <div className="flex flex-wrap gap-4 py-2">
+                                {results.dOverride && (
+                                    <div className="bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 p-4 rounded-r-2xl flex-1 min-w-[240px]">
+                                        <span className="flex items-center gap-2 text-red-600 font-black text-xs uppercase mb-1">
+                                            <ArrowUpRight className="w-4 h-4" /> {t.diseaseOverride}
+                                        </span>
+                                        <p className="text-sm font-bold text-red-800/70">{isRtl ? 'ضایعات فعال → پرخطر' : 'Active lesions → HIGH RISK'}</p>
+                                    </div>
+                                )}
+                                {results.eOverride && (
+                                    <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-4 rounded-2xl flex-1 min-w-[240px] shadow-lg">
+                                        <span className="flex items-center gap-2 text-emerald-400 font-black text-xs uppercase mb-1">
+                                            <Zap className="w-4 h-4" /> {t.extremeOverride}
+                                        </span>
+                                        <p className="text-sm font-bold text-slate-300">{isRtl ? 'پرخطر + نقص بزاق → بسیار پرخطر' : 'High + Dry Mouth → EXTREME'}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Action Plan */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-3 px-2">
+                                <ClipboardCheck className="w-5 h-5 text-indigo-600" />
+                                <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">{isRtl ? 'برنامه درمانی' : 'ACTION PLAN'}</h3>
+                                <div className="flex-1 h-[1px] bg-gradient-to-r from-slate-200 to-transparent"></div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div className="bg-white rounded-3xl border-2 border-slate-200 overflow-hidden hover:shadow-xl transition-all">
+                                    <div className="bg-gradient-to-r from-slate-50 to-slate-100 border-b-2 border-slate-200 p-4 flex items-center gap-2">
+                                        <Calendar className="w-4 h-4 text-slate-500" />
+                                        <span className="font-black text-xs text-slate-500 uppercase tracking-wider">{t.recDiagnostics}</span>
+                                    </div>
+                                    <div className="p-5">
+                                        <div dangerouslySetInnerHTML={{ __html: t[RecMap[results.finalCat].d] }}
+                                            className="text-sm text-slate-700 leading-relaxed space-y-3" />
+                                    </div>
+                                </div>
+                                <div className="bg-white rounded-3xl border-2 border-slate-900 overflow-hidden hover:shadow-xl transition-all">
+                                    <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-4 flex items-center justify-between">
+                                        <span className="font-black text-xs text-indigo-300 uppercase tracking-wider flex items-center gap-2">
+                                            <Zap className="w-4 h-4" /> {t.recInterventions}
+                                        </span>
+                                        <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                                    </div>
+                                    <div className="p-5">
+                                        <div dangerouslySetInnerHTML={{ __html: t[RecMap[results.finalCat].i] }}
+                                            className="text-sm text-slate-700 leading-relaxed space-y-3" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+                            {/* PDF */}
+                            <button onClick={() => setShowPdfModal(true)}
+                                className="group relative cursor-pointer active:scale-95 transition-transform">
+                                <div className="absolute inset-0 bg-slate-700 rounded-2xl translate-y-1"></div>
+                                <div className="relative bg-slate-800 text-white border-2 border-slate-700 px-8 py-4 rounded-2xl font-black text-base flex items-center gap-3 group-hover:translate-y-0.5 transition-transform shadow-lg">
+                                    <Download className="w-5 h-5" />
+                                    {isRtl ? 'ذخیره PDF' : 'Save PDF'}
+                                </div>
+                            </button>
+
+                            {/* Submit */}
+                            <button onClick={submitToServer} disabled={isSubmitting}
+                                className="group relative cursor-pointer active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
+                                <div className="absolute inset-0 bg-indigo-800 rounded-2xl translate-y-1"></div>
+                                <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-2 border-indigo-500 px-8 py-4 rounded-2xl font-black text-base flex items-center gap-3 group-hover:translate-y-0.5 transition-transform shadow-lg shadow-indigo-300/30">
+                                    {isSubmitting ? <Activity className="animate-spin w-5 h-5" /> : <ClipboardCheck className="w-5 h-5" />}
+                                    {isSubmitting ? (isRtl ? 'ثبت...' : 'SAVING...') : (isRtl ? 'ثبت و خروج' : 'FINISH & LOG')}
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            {/* ═══ BOTTOM NAV ═══ */}
+            {!isWelcome && (
+                <nav className="fixed bottom-3 left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-xl z-40 pointer-events-none">
+                    <div className="bg-white/90 backdrop-blur-xl border-2 border-slate-900 rounded-2xl px-2 py-1 flex items-center justify-between gap-1 pointer-events-auto shadow-[4px_4px_0px_#0f172a]">
+                        <button
+                            disabled={tabOrder.indexOf(activeTab) <= 1}
+                            onClick={() => setActiveTab(tabOrder[tabOrder.indexOf(activeTab) - 1])}
+                            className={`flex-shrink-0 w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center disabled:opacity-20 hover:bg-slate-200 cursor-pointer active:scale-90 transition-all ${tabOrder.indexOf(activeTab) <= 1 ? 'invisible' : ''}`}
+                        >
+                            <ChevronLeft className={`w-4 h-4 text-slate-800 ${isRtl ? 'scale-x-[-1]' : ''}`} strokeWidth={3} />
+                        </button>
+
+                        <div className="hidden sm:flex flex-1 justify-center gap-1.5">
+                            {tabOrder.filter(t => t !== 'welcome').map((tab, idx) => {
+                                const ci = tabOrder.indexOf(activeTab) - 1;
+                                const isA = idx === ci;
+                                const isP = idx < ci;
+                                return (
+                                    <div key={tab} className={`transition-all duration-500 rounded-full border-2 border-slate-900 ${isA ? 'w-5 h-2 bg-indigo-500 shadow-sm' : isP ? 'w-2 h-2 bg-slate-900' : 'w-2 h-2 bg-slate-200'}`} />
+                                );
+                            })}
+                        </div>
+
+                        <div className="flex sm:hidden flex-1 justify-center">
+                            <span className="font-black font-mono text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg text-xs" dir="ltr">
+                                {toFaNum(tabOrder.indexOf(activeTab), lang)} / {toFaNum(tabOrder.length - 1, lang)}
+                            </span>
+                        </div>
+
+                        <button
+                            disabled={tabOrder.indexOf(activeTab) === tabOrder.length - 1 || !isTabValid(activeTab)}
+                            onClick={() => setActiveTab(tabOrder[tabOrder.indexOf(activeTab) + 1])}
+                            className={`flex-shrink-0 w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center disabled:opacity-20 hover:bg-slate-200 cursor-pointer active:scale-90 transition-all ${tabOrder.indexOf(activeTab) === tabOrder.length - 1 ? 'invisible' : ''}`}
+                        >
+                            <ChevronRight className={`w-4 h-4 text-slate-800 ${isRtl ? 'scale-x-[-1]' : ''}`} strokeWidth={3} />
+                        </button>
+                    </div>
+                </nav>
+            )}
+
+            {/* ═══ PDF MODAL ═══ */}
+            <PdfExportModal
+                open={showPdfModal}
+                onClose={() => setShowPdfModal(false)}
+                lang={lang}
+                patient={patient}
+                results={results}
+                config={config}
+                diseaseInd={diseaseInd}
+                riskFact={riskFact}
+                protFact={protFact}
+            />
+
+            {/* ═══ ALERT MODAL ═══ */}
+            {appAlert.show && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white border-4 border-slate-900 shadow-[8px_8px_0px_rgba(0,0,0,1)] w-full max-w-sm p-6 text-center rounded-3xl">
+                        <div className="mb-4">
+                            {appAlert.type === 'success' ? (
+                                <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto border-4 border-emerald-500 shadow-lg shadow-emerald-200">
+                                    <Check className="w-8 h-8" strokeWidth={4} />
+                                </div>
+                            ) : (
+                                <div className="w-16 h-16 bg-gradient-to-br from-red-100 to-rose-100 text-red-600 rounded-full flex items-center justify-center mx-auto border-4 border-red-500 shadow-lg shadow-red-200">
+                                    <AlertCircle className="w-8 h-8" strokeWidth={4} />
+                                </div>
+                            )}
+                        </div>
+                        <h3 className="text-xl font-black uppercase tracking-widest mb-3">
+                            {appAlert.type === 'success' ? (isRtl ? 'موفقیت' : 'SUCCESS') : (isRtl ? 'خطا' : 'ERROR')}
+                        </h3>
+                        <p className="text-slate-600 font-bold mb-6">{appAlert.message}</p>
+                        <button
+                            onClick={() => {
+                                if (appAlert.onClose) appAlert.onClose();
+                                setAppAlert(a => ({ ...a, show: false, onClose: null }));
+                            }}
+                            className="w-full py-3.5 bg-slate-900 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-slate-700 transition-colors cursor-pointer active:scale-95"
+                        >
+                            {isRtl ? 'باشه' : 'OK'}
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

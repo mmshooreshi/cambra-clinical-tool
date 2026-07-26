@@ -1,0 +1,673 @@
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import {
+    Globe, Activity, User, Check, AlertCircle, Shield, PieChart, Save, 
+    ChevronLeft, ChevronRight, Zap, Scale, Stethoscope, ShieldCheck, 
+    ClipboardCheck, Calendar, ArrowUpRight, Droplets, Info, ChevronDown, 
+    Dices, Printer, Settings, X, Lock
+} from 'lucide-react';
+
+// Date Picker Imports
+import DatePicker, { DateObject } from "react-multi-date-picker";
+import persian from "react-date-object/calendars/persian";
+import persian_fa from "react-date-object/locales/persian_fa";
+import gregorian from "react-date-object/calendars/gregorian";
+import gregorian_en from "react-date-object/locales/gregorian_en";
+
+const DatePickerComponent = DatePicker.default || DatePicker;
+
+// --- UTILITIES ---
+
+// 1. Number Localizer (English -> Persian)
+const toFa = (num, lang) => {
+    if (lang !== 'fa' || num === null || num === undefined) return num;
+    return num.toString().replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+};
+
+// 2. Random Dental Token Generator (Based on your Backend)
+const generateDentalToken = () => {
+    const STATE = ["caffeinated", "panicked", "manic", "trembling", "zen", "cursed", "pure", "lazy", "toxic"];
+    const ACTION = ["mixing", "carving", "drilling", "flossing", "curing", "etching", "bonding", "polishing"];
+    const NOUN = ["alginate", "amalgam", "typodont", "handpiece", "explorer", "scaler", "enamel", "dentin"];
+    return `${STATE[Math.floor(Math.random() * STATE.length)]}-${ACTION[Math.floor(Math.random() * ACTION.length)]}-${NOUN[Math.floor(Math.random() * NOUN.length)]}`;
+};
+
+// --- CUSTOM UI COMPONENTS ---
+
+// Custom Animated Select/Combo Box
+const CustomSelect = ({ value, options, onChange, label, lang }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const selectRef = useRef(null);
+    const isRtl = lang === 'fa';
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (selectRef.current && !selectRef.current.contains(e.target)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedLabel = options.find(o => o.value === value)?.label;
+
+    return (
+        <div className="flex flex-col gap-2 relative cursor-pointer" ref={selectRef}>
+            <label className="text-sm font-semibold text-slate-600 cursor-pointer">{label}</label>
+            <div 
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full min-h-[56px] flex items-center justify-between p-4 border-2 border-slate-200 hover:border-indigo-400 bg-white rounded-xl outline-none transition-all duration-300 shadow-sm"
+            >
+                <span className="text-base font-bold text-slate-900">{selectedLabel}</span>
+                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180 text-indigo-500' : ''}`} />
+            </div>
+            
+            {/* Animated Dropdown Menu */}
+            <div className={`absolute top-full left-0 right-0 mt-2 bg-white border-2 border-slate-200 rounded-xl shadow-xl overflow-hidden z-50 transition-all duration-300 origin-top ${isOpen ? 'opacity-100 scale-100 pointer-events-auto translate-y-0' : 'opacity-0 scale-95 pointer-events-none -translate-y-2'}`}>
+                {options.map((opt) => (
+                    <div 
+                        key={opt.value}
+                        onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                        className={`p-4 text-base font-bold cursor-pointer transition-colors flex items-center justify-between ${value === opt.value ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+                    >
+                        {opt.label}
+                        {value === opt.value && <Check className="w-5 h-5 text-indigo-600" />}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// Re-imagined Animated Data Row (Ambient Score Background)
+const DataRow = ({ label, hint, desc, checked, onChange, idx, color, weightTag, lang }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const isRtl = lang === 'fa';
+    
+    // Smooth Gradients based on Status
+    const bgStyles = {
+        red: checked ? 'bg-gradient-to-r from-red-50 to-white border-red-200 shadow-md' : 'bg-white border-slate-200 hover:border-red-300',
+        amber: checked ? 'bg-gradient-to-r from-amber-50 to-white border-amber-200 shadow-md' : 'bg-white border-slate-200 hover:border-amber-300',
+        emerald: checked ? 'bg-gradient-to-r from-emerald-50 to-white border-emerald-200 shadow-md' : 'bg-white border-slate-200 hover:border-emerald-300'
+    };
+
+    const textColors = {
+        red: 'text-red-600', amber: 'text-amber-600', emerald: 'text-emerald-600'
+    };
+
+    return (
+        <div className={`relative group flex flex-col border-2 rounded-2xl mb-4 transition-all duration-500 overflow-hidden cursor-pointer ${bgStyles[color]}`}>
+            
+            {/* AMBIENT BACKGROUND NUMBER */}
+            <div className={`absolute ${isRtl ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 text-8xl font-black pointer-events-none transition-all duration-700 ease-out select-none
+                ${checked ? 'opacity-[0.035] scale-100' : 'opacity-0 scale-50'} 
+                ${textColors[color]}`}
+                dir="ltr"
+            >
+                {toFa(weightTag, lang)}
+            </div>
+
+            <div className="relative z-10 flex items-start justify-between gap-4 p-5 md:p-6" onClick={() => onChange(idx)}>
+                <div className="flex items-start gap-4 md:gap-5 flex-1">
+                    <div className={`mt-0.5 flex-shrink-0 w-8 h-8 rounded-xl border-2 flex items-center justify-center transition-all duration-300 shadow-sm ${checked ? `bg-${color}-500 border-transparent shadow-${color}-200` : 'border-slate-300 bg-white group-hover:bg-slate-50'}`}>
+                        <Check className={`w-5 h-5 text-white transition-transform duration-500 ${checked ? 'scale-100 opacity-100 rotate-0' : 'scale-50 opacity-0 -rotate-45'}`} strokeWidth={3} />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className={`text-base md:text-lg font-black leading-tight transition-colors duration-300 ${checked ? 'text-slate-900' : 'text-slate-700'}`}>
+                            {label}
+                        </span>
+                        <span className="mt-1.5 text-sm text-slate-500 font-medium">{hint}</span>
+                    </div>
+                </div>
+                
+                <div className="flex flex-col items-end gap-3 z-20">
+                    {desc && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+                            className={`p-2 rounded-full transition-all duration-300 active:scale-90 ${isExpanded ? 'bg-slate-200 text-slate-800 shadow-inner' : 'bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700'}`}
+                        >
+                            <Info className="w-5 h-5" />
+                        </button>
+                    )}
+                </div>
+            </div>
+            
+            {/* Expanded Description Box */}
+            <div className={`relative z-10 overflow-hidden transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-96 opacity-100 mb-4' : 'max-h-0 opacity-0'}`}>
+                <div className={`px-5 md:px-6 pb-2 ${isRtl ? 'mr-12 md:mr-14' : 'ml-12 md:ml-14'}`}>
+                    <div className="p-4 bg-white/60 backdrop-blur-sm rounded-xl text-sm md:text-base text-slate-700 font-medium leading-relaxed border border-slate-200 shadow-sm">
+                        {desc}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default function CambraApp() {
+    const [lang, setLang] = useState('fa');
+    const [activeTab, setActiveTab] = useState('welcome');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [config, setConfig] = useState(null);
+
+    // Date State (Keep as standard JS Date object to allow swapping calendars easily)
+    const [patient, setPatient] = useState({
+        name: '', chartNo: '', date: new Date(), assessmentType: 'baseline'
+    });
+
+    const [diseaseInd, setDiseaseInd] = useState([]);
+    const [riskFact, setRiskFact] = useState([]);
+    const [protFact, setProtFact] = useState([]);
+
+    const [appAlert, setAppAlert] = useState({ show: false, message: '', type: 'info', onClose: null });
+    
+    // PDF Modal State
+    const [showPdfModal, setShowPdfModal] = useState(false);
+    const [pdfConfig, setPdfConfig] = useState({
+        patient: true, pathology: true, biology: true, protection: true, results: true, actionPlan: true
+    });
+
+    useEffect(() => {
+        fetch('https://attendance.rlh.ir/appliance_survey/api/cambra/config')
+            .then(res => res.json())
+            .then(data => {
+                setConfig(data);
+                const settings = Reflect.get(data, 'settings');
+                setDiseaseInd(new Array(Reflect.get(settings, 'diseaseCount')).fill(false));
+                setRiskFact(new Array(Reflect.get(settings, 'riskCount')).fill(false));
+                setProtFact(new Array(Reflect.get(settings, 'protectiveCount')).fill(false));
+            })
+            .catch(err => console.error(err));
+    }, []);
+
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [activeTab]);
+
+    const results = useMemo(() => {
+        if (!config) return null;
+        const settings = Reflect.get(config, 'settings');
+        const dCount = diseaseInd.filter(Boolean).length;
+        const rCount = riskFact.filter(Boolean).length;
+        const pCount = protFact.filter(Boolean).length;
+        const dScore = dCount * Reflect.get(settings, 'diseaseWeight');
+        const rScore = rCount * Reflect.get(settings, 'riskWeight');
+        const pScore = pCount * Reflect.get(settings, 'protectiveWeight');
+        const score = (dScore + rScore) - pScore;
+
+        let base = 'lowRisk';
+        if (score >= Reflect.get(settings, 'extremeMin')) base = 'extremeRisk';
+        else if (score >= Reflect.get(settings, 'modMax') + 1) base = 'highRisk';
+        else if (score >= Reflect.get(settings, 'lowMax') + 1) base = 'moderateRisk';
+
+        let finalCat = base, dOverride = false, eOverride = false, orthoOverride = false;
+        if (riskFact.at(7) && base === 'lowRisk') { finalCat = 'moderateRisk'; orthoOverride = true; }
+        if (dCount > 0 && (finalCat === 'lowRisk' || finalCat === 'moderateRisk')) { finalCat = 'highRisk'; dOverride = true; orthoOverride = false; }
+        const hasHyposalivation = riskFact.at(1) || riskFact.at(4);
+        if (finalCat === 'highRisk' && hasHyposalivation) { finalCat = 'extremeRisk'; eOverride = true; dOverride = false; }
+
+        return { dCount, rCount, pCount, dScore, rScore, pScore, score, finalCat, dOverride, eOverride, orthoOverride, hasHyposalivation };
+    }, [diseaseInd, riskFact, protFact, config]);
+
+    const tabOrder = ['welcome', 'patient', 'disease', 'protective', 'results'];
+    const isTabValid = (id) => (id === 'patient') ? (patient.name.length > 0 && patient.chartNo.length > 0) : true;
+
+    const toggleItem = (setter, idx) => setter(prev => {
+        const n = [...prev]; n[idx] = !n[idx]; return n;
+    });
+
+    const triggerPrint = () => {
+        setShowPdfModal(false);
+        setTimeout(() => window.print(), 300);
+    };
+
+        const submitToServer = async () => {
+        setIsSubmitting(true);
+        try {
+            const currentDict = config.dict[lang];
+            const getCheckedLabels = (arr, prefix) =>
+                arr.map((v, i) => v ? currentDict[`${prefix}_${i + 1}`] : null).filter(Boolean);
+
+            // Convert date to gregorian for storage
+            let storedDate = patient.date;
+            if (lang === 'fa' && patient.date) {
+                const [y, m, d] = patient.date.split('-').map(Number);
+                if (y < 1500) {
+                    const g = jalaliToGregorian(y, m, d);
+                    storedDate = dateToString(g.gy, g.gm, g.gd);
+                }
+            }
+
+            const payload = {
+                patient_name: patient.name,
+                chart_no: patient.chartNo,
+                assessment_type: patient.assessmentType,
+                disease_ind: JSON.stringify(getCheckedLabels(diseaseInd, 'di')),
+                risk_fact: JSON.stringify(getCheckedLabels(riskFact, 'rf')),
+                prot_fact: JSON.stringify(getCheckedLabels(protFact, 'pf')),
+                severe_hypo: results.hasHyposalivation.toString(),
+                net_score: results.score,
+                final_category: results.finalCat,
+                raw_data: JSON.stringify({ patient: { ...patient, date: storedDate }, diseaseInd, riskFact, protFact })
+            };
+
+            const response = await fetch('https://attendance.rlh.ir/appliance_survey/api/cambra/submit', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                setAppAlert({ show: true, message: lang === 'fa' ? 'با موفقیت ثبت شد!' : 'Submitted successfully!', type: 'success', onClose: resetForm });
+            } else {
+                setAppAlert({ show: true, message: lang === 'fa' ? 'خطا در ثبت اطلاعات.' : 'Error submitting data.', type: 'error' });
+            }
+        } catch {
+            setAppAlert({ show: true, message: lang === 'fa' ? 'اینترنت خود را بررسی کنید.' : 'Check your internet connection.', type: 'error' });
+        }
+        setIsSubmitting(false);
+    };
+
+
+    if (!config) {
+        return <div className="min-h-screen flex items-center justify-center font-bold text-slate-500">Loading Configuration...</div>;
+    }
+
+    const t = config.dict[lang];
+    const isRtl = lang === 'fa';
+    const settings = config.settings;
+
+    const tabs = [
+        { id: 'welcome', icon: Info, label: isRtl ? 'راهنما' : 'Intro' },
+        { id: 'patient', icon: User, label: t.tabPatient },
+        { id: 'disease', icon: AlertCircle, label: t.tabDisease },
+        { id: 'protective', icon: Shield, label: t.tabProtective },
+        { id: 'results', icon: PieChart, label: t.tabResults }
+    ];
+
+    const CatColors = { extremeRisk: 'bg-red-900 text-red-50 border-red-900', highRisk: 'bg-red-600 text-white border-red-600', moderateRisk: 'bg-amber-500 text-amber-950 border-amber-500', lowRisk: 'bg-emerald-600 text-white border-emerald-600' };
+    const RecMap = { lowRisk: { d: 'rec_low_diag', i: 'rec_low_int' }, moderateRisk: { d: 'rec_mod_diag', i: 'rec_mod_int' }, highRisk: { d: 'rec_high_diag', i: 'rec_high_int' }, extremeRisk: { d: 'rec_ext_diag', i: 'rec_ext_int' } };
+
+    return (
+        <div dir={isRtl ? 'rtl' : 'ltr'} className={`min-h-screen bg-slate-50 text-slate-900 font-sans pb-32 print:pb-0 print:bg-white ${isRtl ? 'font-arabic' : ''}`}>
+
+            {/* HEADER */}
+            <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 sticky top-0 z-40 flex items-center justify-between shadow-sm print:hidden">
+                <div className="flex items-center gap-3">
+                    <div className="bg-slate-900 text-white p-2.5 rounded-xl shadow-md">
+                        <Activity className="w-6 h-6" />
+                    </div>
+                    <div className="flex flex-col">
+                        <h1 className="font-black text-xl text-slate-900 leading-tight">{t.title}</h1>
+                        <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{t.subtitle}</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => window.location.href = '/admin-cambra-789'} 
+                        className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors hidden sm:flex"
+                        title={isRtl ? 'پنل ادمین' : 'Admin Panel'}
+                    >
+                        <Lock className="w-5 h-5" />
+                    </button>
+                    <button 
+                        onClick={() => setLang(lang === 'en' ? 'fa' : 'en')} 
+                        className="px-4 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-black transition-colors"
+                    >
+                        {t.language}
+                    </button>
+                </div>
+            </header>
+
+            {/* MAIN CONTENT */}
+            <main className="max-w-4xl mx-auto p-4 md:p-8">
+                
+                {/* TAB: WELCOME (Hidden on Print) */}
+                <div className={`${activeTab !== 'welcome' ? 'hidden' : 'block animate-in fade-in zoom-in-95 duration-500'} print:hidden`}>
+                    <div className="bg-white rounded-[2rem] border-4 border-slate-900 shadow-[8px_8px_0px_#0f172a] p-8 md:p-16 flex flex-col items-center text-center space-y-8">
+                        <div className="w-24 h-24 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center border-4 border-indigo-600 transform -rotate-3 hover:rotate-3 transition-transform duration-300">
+                            <Stethoscope className="w-12 h-12" />
+                        </div>
+                        <h2 className="text-4xl md:text-5xl font-black text-slate-900 uppercase tracking-tighter">
+                            {isRtl ? 'به دستیار کمبرا خوش آمدید' : 'Welcome to CAMBRA'}
+                        </h2>
+                        <p className="text-slate-600 font-medium text-lg md:text-xl leading-relaxed max-w-2xl">
+                            {isRtl 
+                                ? 'این ابزار هوشمند جهت ارزیابی دقیق میزان خطر پوسیدگی دندان طراحی شده است. لطفاً اطلاعات بیمار و شاخص‌های بالینی را با دقت وارد نمایید تا پروتکل درمانی و پیشگیرانه اختصاصی تولید گردد.' 
+                                : 'This clinical tool assesses dental caries risk. Please enter patient details and clinical indicators carefully to generate a customized preventive protocol.'}
+                        </p>
+                        <button 
+                            onClick={() => setActiveTab('patient')}
+                            className="mt-6 group bg-indigo-600 text-white font-black text-xl px-10 py-5 rounded-2xl border-4 border-slate-900 shadow-[6px_6px_0px_#0f172a] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all flex items-center gap-3"
+                        >
+                            {isRtl ? 'شروع ارزیابی' : 'Start Assessment'}
+                            <ChevronLeft className={`w-6 h-6 ${!isRtl ? 'rotate-180' : ''}`} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* TAB: PATIENT */}
+                <div className={`${activeTab !== 'patient' ? 'hidden' : 'block animate-in fade-in slide-in-from-bottom-4 duration-500'} ${!pdfConfig.patient ? 'print:hidden' : 'print:block print:mb-8'}`}>
+                    <div className="bg-white rounded-3xl border-2 border-slate-200 overflow-hidden shadow-sm">
+                        <div className="bg-slate-50 px-8 py-5 border-b-2 border-slate-100">
+                            <h2 className="text-sm font-black text-slate-700 uppercase tracking-widest">{t.patientInfo}</h2>
+                        </div>
+                        <div className="p-8 grid grid-cols-1 sm:grid-cols-2 gap-8">
+                            <div className="flex flex-col gap-3">
+                                <label className="text-sm font-bold text-slate-600">{t.patientName}</label>
+                                <input type="text" value={patient.name} onChange={e => setPatient({ ...patient, name: e.target.value })} className="w-full text-lg font-bold min-h-[56px] px-4 border-2 border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-colors" />
+                            </div>
+                            
+                            <div className="flex flex-col gap-3 relative">
+                                <label className="text-sm font-bold text-slate-600">{t.chartNo}</label>
+                                <div className="relative">
+                                    <input type="text" value={patient.chartNo} onChange={e => setPatient({ ...patient, chartNo: e.target.value })} className={`w-full text-lg font-bold min-h-[56px] px-4 ${isRtl ? 'pl-16' : 'pr-16'} border-2 border-slate-200 rounded-xl outline-none focus:border-indigo-500 transition-colors`} />
+                                    <button 
+                                        onClick={() => setPatient({ ...patient, chartNo: generateDentalToken() })}
+                                        className={`absolute top-1/2 -translate-y-1/2 ${isRtl ? 'left-2' : 'right-2'} p-2.5 bg-slate-100 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors print:hidden`}
+                                        title={isRtl ? 'تولید شناسه تصادفی' : 'Generate Random ID'}
+                                    >
+                                        <Dices className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="flex flex-col gap-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-sm font-bold text-slate-600">{t.date}</label>
+                                    <div className="flex gap-2 print:hidden">
+                                        <button onClick={() => setPatient({ ...patient, date: new Date(new Date().setDate(new Date().getDate() - 1)) })} className="text-[10px] font-black bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 transition-colors">{isRtl ? 'دیروز' : 'Yest'}</button>
+                                        <button onClick={() => setPatient({ ...patient, date: new Date() })} className="text-[10px] font-black bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded text-indigo-600 transition-colors">{isRtl ? 'امروز' : 'Today'}</button>
+                                    </div>
+                                </div>
+                                <DatePickerComponent
+                                    value={patient.date}
+                                    onChange={(dateObj) => setPatient({ ...patient, date: dateObj ? dateObj.toDate() : new Date() })}
+                                    calendar={isRtl ? persian : gregorian}
+                                    locale={isRtl ? persian_fa : gregorian_en}
+                                    inputClass="w-full text-lg font-bold min-h-[56px] px-4 border-2 border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-left transition-colors cursor-pointer"
+                                    containerClassName="w-full"
+                                />
+                            </div>
+                            
+                            <CustomSelect 
+                                label={t.assessmentType}
+                                lang={lang}
+                                value={patient.assessmentType} 
+                                onChange={(val) => setPatient({ ...patient, assessmentType: val })}
+                                options={[{ value: 'baseline', label: t.baseline }, { value: 'recall', label: t.recall }]}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* TAB: DISEASE & RISK */}
+                <div className={`${activeTab !== 'disease' ? 'hidden' : 'block animate-in fade-in slide-in-from-bottom-4 duration-500'} space-y-8 ${!pdfConfig.pathology && !pdfConfig.biology ? 'print:hidden' : 'print:block print:space-y-4 print:mb-8'}`}>
+                    
+                    <div className={`bg-white rounded-3xl border-2 border-slate-200 shadow-sm ${!pdfConfig.pathology ? 'print:hidden' : ''}`}>
+                        <div className="bg-slate-50 border-b-2 border-slate-100 px-8 py-5">
+                            <h2 className="text-sm font-black text-slate-700 uppercase tracking-widest">{t.diseaseIndicators}</h2>
+                            <p className="text-xs text-slate-500 mt-1 font-bold">{t.diseaseIndSubtitle}</p>
+                        </div>
+                        <div className="p-4">
+                            {Array.from({ length: settings.diseaseCount }).map((_, idx) => (
+                                <DataRow key={`di_${idx}`} lang={lang} label={t[`di_${idx + 1}`]} hint={t[`di_${idx + 1}_hint`]} desc={t[`di_${idx + 1}_desc`]} checked={diseaseInd[idx]} onChange={(i) => toggleItem(setDiseaseInd, i)} idx={idx} color="red" weightTag={`+${settings.diseaseWeight}`} />
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className={`bg-white rounded-3xl border-2 border-slate-200 shadow-sm ${!pdfConfig.biology ? 'print:hidden' : ''}`}>
+                        <div className="bg-slate-50 border-b-2 border-slate-100 px-8 py-5">
+                            <h2 className="text-sm font-black text-slate-700 uppercase tracking-widest">{t.riskFactors}</h2>
+                            <p className="text-xs text-slate-500 mt-1 font-bold">{t.riskFactSubtitle}</p>
+                        </div>
+                        <div className="p-4">
+                            {Array.from({ length: settings.riskCount }).map((_, idx) => (
+                                <DataRow key={`rf_${idx}`} lang={lang} label={t[`rf_${idx + 1}`]} hint={t[`rf_${idx + 1}_hint`]} desc={t[`rf_${idx + 1}_desc`]} checked={riskFact[idx]} onChange={(i) => toggleItem(setRiskFact, i)} idx={idx} color="amber" weightTag={`+${settings.riskWeight}`} />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* TAB: PROTECTIVE */}
+                <div className={`${activeTab !== 'protective' ? 'hidden' : 'block animate-in fade-in slide-in-from-bottom-4 duration-500'} ${!pdfConfig.protection ? 'print:hidden' : 'print:block print:mb-8'}`}>
+                    <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-sm">
+                        <div className="bg-slate-50 border-b-2 border-slate-100 px-8 py-5">
+                            <h2 className="text-sm font-black text-slate-700 uppercase tracking-widest">{t.protectiveFactors}</h2>
+                            <p className="text-xs text-slate-500 mt-1 font-bold">{t.protFactSubtitle}</p>
+                        </div>
+                        <div className="p-4">
+                            {Array.from({ length: settings.protectiveCount }).map((_, idx) => (
+                                <DataRow key={`pf_${idx}`} lang={lang} label={t[`pf_${idx + 1}`]} hint={t[`pf_${idx + 1}_hint`]} desc={t[`pf_${idx + 1}_desc`]} checked={protFact[idx]} onChange={(i) => toggleItem(setProtFact, i)} idx={idx} color="emerald" weightTag={`-${settings.protectiveWeight}`} />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* TAB: RESULTS */}
+                <div className={`${activeTab !== 'results' ? 'hidden' : 'block animate-in fade-in slide-in-from-bottom-4 duration-500'} space-y-8 ${!pdfConfig.results ? 'print:hidden' : 'print:block'}`}>
+                    
+                    {/* Status Stamp */}
+                    <div className="relative group w-full">
+                        <div className="relative w-full rounded-3xl border-4 border-slate-900 shadow-[12px_12px_0px_#0f172a] flex flex-col md:flex-row overflow-hidden bg-white print:border-2 print:shadow-none">
+                            <div className={`relative flex-1 p-10 md:p-14 flex flex-col justify-center overflow-hidden transition-all duration-500 ${CatColors[results.finalCat].split(' ')[0]}`}>
+                                <div className="absolute inset-0 opacity-10 pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'radial-gradient(#000 1.5px, transparent 1.5px)', backgroundSize: '16px 16px' }}></div>
+                                <Shield className="absolute -right-12 -bottom-12 w-96 h-96 opacity-[0.05] text-black rotate-12 transition-transform duration-700 group-hover:rotate-0 pointer-events-none" strokeWidth={1} />
+                                <div className="relative z-10 flex flex-col items-start">
+                                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-black/10 text-black border-2 border-black/20 rounded-full text-xs font-black uppercase tracking-[0.2em] backdrop-blur-md mb-6">
+                                        <Activity className="w-4 h-4" /> {isRtl ? 'نتیجه نهایی الگوریتم' : 'FINAL ALGORITHM VERDICT'}
+                                    </div>
+                                    <h2 className="text-6xl md:text-7xl font-black uppercase tracking-tighter leading-[0.85] text-white drop-shadow-[4px_4px_0px_rgba(0,0,0,0.3)]">
+                                        {t[results.finalCat]}
+                                    </h2>
+                                </div>
+                            </div>
+                            <div className="w-full md:w-[320px] bg-slate-900 text-white p-10 flex flex-col justify-between border-t-4 md:border-t-0 md:border-l-4 border-slate-900 relative print:border-0 print:bg-white print:text-slate-900">
+                                <div className="absolute inset-2 border border-slate-700/50 rounded-2xl pointer-events-none print:hidden"></div>
+                                <div className="relative z-10 flex flex-col gap-1 mb-8">
+                                    <span className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-2 print:text-slate-500">
+                                        <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse print:hidden"></div>
+                                        {isRtl ? 'نمره خالص' : 'NET SCORE'}
+                                    </span>
+                                    <div className="flex items-end gap-3 mt-2" dir="ltr">
+                                        <span className="text-8xl font-black font-mono leading-none tracking-tighter text-white drop-shadow-[0_0_15px_rgba(99,102,241,0.5)] print:text-slate-900 print:drop-shadow-none">
+                                            {toFa(results.score > 0 ? `+${results.score}` : results.score, lang)}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="relative z-10 flex-1 flex flex-col justify-end">
+                                    {results.hasHyposalivation ? (
+                                        <div className="bg-red-500 text-white border-2 border-red-300 p-4 rounded-xl shadow-[4px_4px_0px_#7f1d1d] print:shadow-none print:border-red-500 print:text-red-900 print:bg-red-50">
+                                            <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest mb-1.5 opacity-90"><Droplets className="w-4 h-4" /> {isRtl ? 'هشدار' : 'WARNING'}</span>
+                                            <span className="font-bold text-base leading-tight block">{isRtl ? 'نقص بزاق ثبت شده است' : 'HYPOSALIVATION ACTIVE'}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-slate-800 text-slate-400 border-2 border-slate-700 p-4 rounded-xl border-dashed print:border-slate-300 print:bg-slate-50 print:text-slate-500">
+                                            <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest mb-1.5 opacity-50"><Droplets className="w-4 h-4" /> {isRtl ? 'وضعیت' : 'STATUS'}</span>
+                                            <span className="font-bold text-base leading-tight block opacity-50">{isRtl ? 'جریان بزاق نرمال' : 'SALIVARY FLOW NORMAL'}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Breakdown */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {[
+                            { key: 'di', score: results.dScore, sign: '+', themeMain: 'bg-red-500', themeLight: 'bg-red-50', themeBorder: 'border-red-200', themeText: 'text-red-800', label: isRtl ? 'پاتولوژی' : 'PATHOLOGY', icon: Stethoscope, items: diseaseInd.map((checked, idx) => checked ? t[`di_${idx + 1}`] : null).filter(Boolean) },
+                            { key: 'rf', score: results.rScore, sign: '+', themeMain: 'bg-amber-500', themeLight: 'bg-amber-50', themeBorder: 'border-amber-200', themeText: 'text-amber-800', label: isRtl ? 'بیولوژی' : 'BIOLOGY', icon: Zap, items: riskFact.map((checked, idx) => checked ? t[`rf_${idx + 1}`] : null).filter(Boolean) },
+                            { key: 'pf', score: results.pScore, sign: '-', themeMain: 'bg-emerald-500', themeLight: 'bg-emerald-50', themeBorder: 'border-emerald-200', themeText: 'text-emerald-800', label: isRtl ? 'محافظت' : 'PROTECTION', icon: ShieldCheck, items: protFact.map((checked, idx) => checked ? t[`pf_${idx + 1}`] : null).filter(Boolean) }
+                        ].map((stat) => {
+                            const StatIcon = stat.icon;
+                            return (
+                                <div key={stat.key} className="relative flex flex-col bg-white rounded-3xl border-4 border-slate-900 shadow-[6px_6px_0px_#0f172a] overflow-hidden print:border-2 print:shadow-none">
+                                    <div className="relative p-6 flex justify-between items-start border-b-2 border-slate-100">
+                                        <div className="flex flex-col gap-3">
+                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 border-slate-900 shadow-[2px_2px_0px_#0f172a] text-white ${stat.themeMain} print:shadow-none`}><StatIcon className="w-6 h-6" /></div>
+                                            <h3 className="font-black text-base text-slate-900 uppercase tracking-widest">{stat.label}</h3>
+                                        </div>
+                                        <div dir="ltr" className={`flex flex-col items-center justify-center px-4 py-2 rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_#0f172a] ${stat.themeLight} print:shadow-none`}>
+                                            <span className={`font-mono font-black text-3xl leading-none ${stat.themeText}`}>{stat.sign}{toFa(stat.score, lang)}</span>
+                                        </div>
+                                    </div>
+                                    <div className="p-6 flex-1 bg-slate-50/50">
+                                        {stat.items.length > 0 ? (
+                                            <div className="flex flex-col gap-2">
+                                                {stat.items.map((item, idx) => (
+                                                    <div key={idx} className={`flex items-start gap-3 p-3 rounded-xl border-2 ${stat.themeBorder} bg-white`}>
+                                                        <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${stat.themeMain}`}></div>
+                                                        <span className={`text-xs font-bold leading-relaxed ${stat.themeText}`}>{item}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center gap-3 opacity-40 py-8">
+                                                <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-900 flex items-center justify-center"><span className="font-mono font-black text-xl">-</span></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Action Plan */}
+                    <div className={`space-y-6 mt-12 ${!pdfConfig.actionPlan ? 'print:hidden' : ''}`}>
+                        <div className="flex items-center gap-4 px-2">
+                            <ClipboardCheck className="w-6 h-6 text-indigo-600" />
+                            <h3 className="font-black text-slate-900 uppercase tracking-widest text-lg">{isRtl ? 'برنامه درمانی اختصاصی' : 'CLINICAL ACTION PLAN'}</h3>
+                            <div className="flex-1 h-[2px] bg-slate-200"></div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="bg-white rounded-[2rem] border-4 border-slate-900 overflow-hidden shadow-[6px_6px_0px_#0f172a] print:border-2 print:shadow-none">
+                                <div className="bg-slate-50 border-b-4 border-slate-900 p-5 flex items-center print:border-b-2">
+                                    <span className="font-black text-sm text-slate-700 uppercase tracking-widest flex items-center gap-3"><Calendar className="w-5 h-5 text-slate-500" /> {t.recDiagnostics}</span>
+                                </div>
+                                <div className="p-8">
+                                    <div dangerouslySetInnerHTML={{ __html: t[RecMap[results.finalCat].d] }} className="text-base text-slate-700 font-medium leading-relaxed space-y-4" />
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-[2rem] border-4 border-slate-900 overflow-hidden shadow-[6px_6px_0px_#0f172a] print:border-2 print:shadow-none">
+                                <div className="bg-slate-900 p-5 flex items-center print:bg-slate-100 print:border-b-2 print:border-slate-900">
+                                    <span className="font-black text-sm text-indigo-300 uppercase tracking-widest flex items-center gap-3 print:text-slate-900"><Zap className="w-5 h-5 text-indigo-400 print:text-slate-600" /> {t.recInterventions}</span>
+                                </div>
+                                <div className="p-8">
+                                    <div dangerouslySetInnerHTML={{ __html: t[RecMap[results.finalCat].i] }} className="text-base text-slate-700 font-medium leading-relaxed space-y-4" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bottom Action Bar */}
+                    <div className="pt-12 pb-8 flex flex-col md:flex-row items-center justify-center gap-6 print:hidden">
+                        <button 
+                            onClick={() => setShowPdfModal(true)} 
+                            className="w-full md:w-auto bg-white text-slate-700 border-4 border-slate-900 px-8 py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-slate-100 hover:shadow-[4px_4px_0px_#0f172a] transition-all"
+                        >
+                            <Printer className="w-6 h-6" />
+                            {isRtl ? 'دریافت گزارش PDF' : 'Save as PDF'}
+                        </button>
+
+                        <button 
+                            onClick={submitToServer} 
+                            disabled={isSubmitting} 
+                            className="w-full md:w-auto relative bg-indigo-600 text-white border-4 border-slate-900 px-12 py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:shadow-[4px_4px_0px_#0f172a] hover:-translate-y-1 transition-all"
+                        >
+                            {isSubmitting ? <Activity className="animate-spin w-6 h-6" /> : <Save className="w-6 h-6" />}
+                            {isSubmitting ? (isRtl ? 'در حال ثبت...' : 'SAVING...') : (isRtl ? 'ثبت در سرور' : 'SUBMIT & LOG')}
+                        </button>
+                    </div>
+                </div>
+            </main>
+
+            {/* FLOATING TACTICAL NAVIGATION */}
+            <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-lg z-40 pointer-events-none print:hidden">
+                <div className="bg-white/95 backdrop-blur-md border-2 border-slate-900 rounded-[2rem] p-1.5 flex items-center justify-between gap-3 pointer-events-auto shadow-[4px_4px_0px_rgba(0,0,0,0.15)]">
+                    <button
+                        disabled={tabOrder.indexOf(activeTab) === 0}
+                        onClick={() => setActiveTab(tabOrder[tabOrder.indexOf(activeTab) - 1])}
+                        className={`group relative flex-shrink-0 w-14 h-14 bg-slate-100 rounded-full border-2 border-slate-900 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-200 active:bg-slate-300 transition-colors ${tabOrder.indexOf(activeTab) === 0 ? 'invisible' : ''}`}
+                    >
+                        <ChevronLeft className={`w-7 h-7 text-slate-900 ${isRtl ? 'transform scale-x-[-1] group-active:translate-x-1' : 'group-active:-translate-x-1'} transition-transform`} strokeWidth={3} />
+                    </button>
+                    
+                    <div className="hidden sm:flex flex-1 justify-center gap-2.5">
+                        {tabOrder.map((tab, idx) => (
+                            <div key={tab} className={`transition-all duration-500 rounded-full border-2 border-slate-900 ${idx === tabOrder.indexOf(activeTab) ? 'w-8 h-3 bg-indigo-500 shadow-[2px_2px_0px_#0f172a]' : idx < tabOrder.indexOf(activeTab) ? 'w-3 h-3 bg-slate-900' : 'w-3 h-3 bg-slate-200'}`} />
+                        ))}
+                    </div>
+
+                    <div className="flex sm:hidden flex-1 justify-center">
+                        <span className="font-bold font-mono text-base text-slate-900 bg-slate-100 border-2 border-slate-900 px-4 py-1 rounded-full" dir="ltr">{toFa(tabOrder.indexOf(activeTab) + 1, lang)} / {toFa(tabOrder.length, lang)}</span>
+                    </div>
+
+                    <button
+                        disabled={tabOrder.indexOf(activeTab) === tabOrder.length - 1 || !isTabValid(activeTab)}
+                        onClick={() => setActiveTab(tabOrder[tabOrder.indexOf(activeTab) + 1])}
+                        className={`group relative flex-shrink-0 w-14 h-14 bg-slate-100 rounded-full border-2 border-slate-900 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-200 active:bg-slate-300 transition-colors ${tabOrder.indexOf(activeTab) === tabOrder.length - 1 ? 'invisible' : ''}`}
+                    >
+                        <ChevronRight className={`w-7 h-7 text-slate-900 ${isRtl ? 'transform scale-x-[-1] group-active:-translate-x-1' : 'group-active:translate-x-1'} transition-transform`} strokeWidth={3} />
+                    </button>
+                </div>
+            </nav>
+
+            {/* PDF EXPORT MODAL */}
+            {showPdfModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 print:hidden">
+                    <div className="bg-white border-4 border-slate-900 shadow-[12px_12px_0px_#0f172a] w-full max-w-md rounded-3xl overflow-hidden">
+                        <div className="bg-slate-50 border-b-2 border-slate-200 p-6 flex items-center justify-between">
+                            <h3 className="font-black text-lg uppercase tracking-widest flex items-center gap-3">
+                                <Settings className="w-5 h-5 text-indigo-600" /> 
+                                {isRtl ? 'تنظیمات گزارش PDF' : 'PDF Export Settings'}
+                            </h3>
+                            <button onClick={() => setShowPdfModal(false)} className="p-2 bg-slate-200 hover:bg-red-100 hover:text-red-600 rounded-full transition-colors"><X className="w-5 h-5" /></button>
+                        </div>
+                        <div className="p-6 space-y-3 bg-slate-50/50">
+                            {[
+                                { key: 'patient', label: isRtl ? 'اطلاعات بیمار' : 'Patient Info' },
+                                { key: 'pathology', label: isRtl ? 'شاخص‌های پاتولوژی' : 'Pathology Indicators' },
+                                { key: 'biology', label: isRtl ? 'عوامل خطر بیولوژی' : 'Biological Risk Factors' },
+                                { key: 'protection', label: isRtl ? 'عوامل محافظتی' : 'Protective Factors' },
+                                { key: 'results', label: isRtl ? 'نتایج و امتیازات' : 'Scores & Results' },
+                                { key: 'actionPlan', label: isRtl ? 'برنامه درمانی' : 'Action Plan' }
+                            ].map(item => (
+                                <label key={item.key} className="flex items-center justify-between p-4 bg-white border-2 border-slate-200 rounded-xl cursor-pointer hover:border-indigo-300 transition-colors">
+                                    <span className="font-bold text-slate-700">{item.label}</span>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={pdfConfig[item.key]} 
+                                        onChange={(e) => setPdfConfig({...pdfConfig, [item.key]: e.target.checked})}
+                                        className="w-6 h-6 text-indigo-600 border-2 border-slate-300 rounded focus:ring-indigo-500"
+                                    />
+                                </label>
+                            ))}
+                        </div>
+                        <div className="p-6 bg-slate-50 border-t-2 border-slate-200">
+                            <button onClick={triggerPrint} className="w-full py-4 bg-indigo-600 text-white font-black text-lg rounded-xl border-4 border-slate-900 shadow-[4px_4px_0px_#0f172a] hover:translate-y-1 hover:shadow-none transition-all flex items-center justify-center gap-3">
+                                <Printer className="w-6 h-6" /> {isRtl ? 'تایید و چاپ' : 'Confirm & Print'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ALERTS MODAL */}
+            {appAlert.show && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200 print:hidden">
+                    <div className="bg-white border-4 border-slate-900 shadow-[8px_8px_0px_rgba(0,0,0,1)] w-full max-w-sm p-6 text-center rounded-3xl">
+                        <div className="mb-4">
+                            {appAlert.type === 'success' ? (
+                                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto border-4 border-emerald-600"><Check className="w-8 h-8" strokeWidth={4} /></div>
+                            ) : (
+                                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto border-4 border-red-600"><AlertCircle className="w-8 h-8" strokeWidth={4} /></div>
+                            )}
+                        </div>
+                        <h3 className="text-xl font-black uppercase tracking-widest mb-4">{appAlert.type === 'success' ? (isRtl ? 'موفقیت' : 'SUCCESS') : (isRtl ? 'خطا' : 'ERROR')}</h3>
+                        <p className="text-slate-600 font-bold mb-6">{appAlert.message}</p>
+                        <button onClick={() => { if (appAlert.onClose) appAlert.onClose(); setAppAlert({ ...appAlert, show: false, onClose: null }); }} className="w-full py-4 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-700 transition-colors">
+                            {isRtl ? 'باشه' : 'OK'}
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

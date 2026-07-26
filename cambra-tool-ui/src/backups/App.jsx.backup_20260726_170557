@@ -1,0 +1,844 @@
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import {
+    Activity, User, Check, AlertCircle, Shield, PieChart,
+    ChevronLeft, ChevronRight, Zap, Stethoscope, ShieldCheck,
+    ClipboardCheck, Calendar, ArrowUpRight, Droplets, Info,
+    ChevronDown, Sparkles, HeartPulse, X, Download,
+    Settings, Shuffle, FileText
+} from 'lucide-react';
+
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL ANIMATION STYLES — injected once
+   ═══════════════════════════════════════════════════════════════ */
+const _SID = 'cambra-v3-styles';
+if (typeof document !== 'undefined' && !document.getElementById(_SID)) {
+    const s = document.createElement('style'); s.id = _SID;
+    s.textContent = `
+@keyframes cFadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes cScaleIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+@keyframes cSlideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
+@keyframes cFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes cGlow{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,.25)}50%{box-shadow:0 0 16px 2px rgba(99,102,241,.12)}}
+.c-fade{animation:cFadeIn .4s cubic-bezier(.22,1,.36,1) both}
+.c-scale{animation:cScaleIn .3s cubic-bezier(.22,1,.36,1) both}
+.c-slide-up{animation:cSlideUp .4s cubic-bezier(.22,1,.36,1) both}
+.c-float{animation:cFloat 3s ease-in-out infinite}
+.c-glow{animation:cGlow 2.5s ease-in-out infinite}
+.c-d1{animation-delay:60ms}.c-d2{animation-delay:120ms}.c-d3{animation-delay:180ms}
+`;
+    document.head.appendChild(s);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
+const FA = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+const toFa = (n, lang) => lang !== 'fa' ? String(n) : String(n).replace(/\d/g, d => FA[+d]);
+
+/* ═══════════════════════════════════════════════════════════════
+   JALALI DATE ENGINE
+   ═══════════════════════════════════════════════════════════════ */
+function g2j(gy,gm,gd){const g=[0,31,59,90,120,151,181,212,243,273,304,334];let jy=gy<=1600?0:979;gy-=gy<=1600?621:1600;const g2=gm>2?gy+1:gy;let d=365*gy+Math.floor((g2+3)/4)-Math.floor((g2+99)/100)+Math.floor((g2+399)/400)-80+gd+g[gm-1];jy+=33*Math.floor(d/12053);d%=12053;jy+=4*Math.floor(d/1461);d%=1461;if(d>365){jy+=Math.floor((d-1)/365);d=(d-1)%365}const jm=d<186?1+Math.floor(d/31):7+Math.floor((d-186)/30);const jd=1+(d<186?d%31:(d-186)%30);return{jy,jm,jd}}
+function j2g(jy,jm,jd){let gy,gm,gd;jy+=1595;let d=-355668+365*jy+Math.floor(jy/33)*8+Math.floor((jy%33+3)/4)+jd+(jm<7?(jm-1)*31:(jm-7)*30+186);gy=400*Math.floor(d/146097);d%=146097;if(d>36524){gy+=100*Math.floor(--d/36524);d%=36524;if(d>=365)d++}gy+=4*Math.floor(d/1461);d%=1461;if(d>365){gy+=Math.floor((d-1)/365);d=(d-1)%365}gd=d+1;const s=[0,31,((gy%4===0&&gy%100!==0)||gy%400===0)?29:28,31,30,31,30,31,31,30,31,30,31];for(gm=0;gm<13&&gd>s[gm];gm++)gd-=s[gm];return{gy,gm,gd}}
+const jLeap=jy=>[1,5,9,13,17,22,26,30].includes(jy%33);
+const jML=(jy,jm)=>jm<=6?31:jm<=11?30:jLeap(jy)?30:29;
+const gLeap=gy=>(gy%4===0&&gy%100!==0)||gy%400===0;
+const gML=(gy,gm)=>[31,gLeap(gy)?29:28,31,30,31,30,31,31,30,31,30,31][gm-1];
+const JM=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+const JW=['ش','ی','د','س','چ','پ','ج'];
+const GM=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const GW=['Su','Mo','Tu','We','Th','Fr','Sa'];
+const todJ=()=>{const d=new Date();return g2j(d.getFullYear(),d.getMonth()+1,d.getDate())};
+const todG=()=>{const d=new Date();return{gy:d.getFullYear(),gm:d.getMonth()+1,gd:d.getDate()}};
+const jDow=(jy,jm,jd)=>{const g=j2g(jy,jm,jd);return(new Date(g.gy,g.gm-1,g.gd).getDay()+1)%7};
+const gDow=(gy,gm,gd)=>new Date(gy,gm-1,gd).getDay();
+const ds=(y,m,d)=>`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+/* ═══════════════════════════════════════════════════════════════
+   PORTAL DROPDOWN — renders on <body>, auto-positions, no clip
+   ═══════════════════════════════════════════════════════════════ */
+function Portal({anchorRef, open, onClose, children, mxH=420}){
+    const [pos,setPos]=useState({top:0,left:0,width:0});
+    const [flip,setFlip]=useState(false);
+    const ref=useRef(null);
+
+    useEffect(()=>{
+        if(!open||!anchorRef.current)return;
+        const up=()=>{
+            const r=anchorRef.current.getBoundingClientRect();
+            const below=window.innerHeight-r.bottom;
+            const fl=below<mxH&&r.top>below;
+            setFlip(fl);
+            setPos({top:fl?r.top+window.scrollY:r.bottom+window.scrollY+4,left:r.left+window.scrollX,width:Math.max(r.width,280)});
+        };
+        up();
+        window.addEventListener('scroll',up,true);
+        window.addEventListener('resize',up);
+        return()=>{window.removeEventListener('scroll',up,true);window.removeEventListener('resize',up)};
+    },[open,anchorRef,mxH]);
+
+    useEffect(()=>{
+        if(!open)return;
+        const h=e=>{if(anchorRef.current?.contains(e.target)||ref.current?.contains(e.target))return;onClose()};
+        document.addEventListener('mousedown',h);document.addEventListener('touchstart',h);
+        return()=>{document.removeEventListener('mousedown',h);document.removeEventListener('touchstart',h)};
+    },[open,onClose,anchorRef]);
+
+    if(!open)return null;
+    return createPortal(
+        <div ref={ref} className="c-scale" style={{position:'absolute',zIndex:9999,
+            top:flip?'auto':pos.top,bottom:flip?`${window.innerHeight-pos.top+4}px`:'auto',
+            left:pos.left,width:pos.width,maxHeight:mxH,transformOrigin:flip?'bottom center':'top center'}}>
+            {children}
+        </div>,document.body);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CALENDAR PICKER
+   ═══════════════════════════════════════════════════════════════ */
+function CalendarPicker({value,onChange,lang}){
+    const fa=lang==='fa';
+    const [open,setOpen]=useState(false);
+    const aRef=useRef(null);
+
+    const parse=useCallback(()=>{
+        if(value){const[y,m,d]=value.split('-').map(Number);return{y,m,d}}
+        if(fa){const t=todJ();return{y:t.jy,m:t.jm,d:t.jd}}
+        const t=todG();return{y:t.gy,m:t.gm,d:t.gd};
+    },[value,fa]);
+
+    const p=parse();
+    const[vY,sY]=useState(p.y);
+    const[vM,sM]=useState(p.m);
+    useEffect(()=>{const pp=parse();sY(pp.y);sM(pp.m)},[value,lang]);
+
+    const mN=fa?JM:GM, wD=fa?JW:GW;
+    const mL=fa?jML(vY,vM):gML(vY,vM);
+    const fD=fa?jDow(vY,vM,1):gDow(vY,vM,1);
+    const td=fa?todJ():todG();
+    const tY=fa?td.jy:td.gy, tM=fa?td.jm:td.gm, tD=fa?td.jd:td.gd;
+
+    const prev=()=>{if(vM===1){sM(12);sY(vY-1)}else sM(vM-1)};
+    const next=()=>{if(vM===12){sM(1);sY(vY+1)}else sM(vM+1)};
+    const pick=d=>{onChange(ds(vY,vM,d));setOpen(false)};
+    const pickT=()=>{if(fa){const t=todJ();onChange(ds(t.jy,t.jm,t.jd))}else{const t=todG();onChange(ds(t.gy,t.gm,t.gd))}setOpen(false)};
+    const pickY=()=>{const y=new Date();y.setDate(y.getDate()-1);if(fa){const j=g2j(y.getFullYear(),y.getMonth()+1,y.getDate());onChange(ds(j.jy,j.jm,j.jd))}else onChange(ds(y.getFullYear(),y.getMonth()+1,y.getDate()));setOpen(false)};
+
+    const disp=()=>{
+        if(!value)return fa?'انتخاب تاریخ':'Select Date';
+        const[y,m,d]=value.split('-').map(Number);
+        return fa?`${toFa(d,'fa')} ${JM[m-1]} ${toFa(y,'fa')}`:`${GM[m-1]} ${d}, ${y}`;
+    };
+
+    const cells=[];
+    for(let i=0;i<fD;i++)cells.push(null);
+    for(let d=1;d<=mL;d++)cells.push(d);
+    while(cells.length%7)cells.push(null);
+
+    return(<>
+        <button ref={aRef} type="button" onClick={()=>setOpen(!open)}
+            className="w-full flex items-center justify-between gap-3 p-3 bg-white border-2 border-slate-200 rounded-2xl font-bold text-base cursor-pointer hover:border-indigo-400 hover:shadow-lg hover:shadow-indigo-100/50 active:scale-[.98] transition-all duration-200">
+            <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                    <Calendar className="w-4 h-4 text-white"/>
+                </div>
+                <span className={!value?'text-slate-400':''}>{disp()}</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${open?'rotate-180':''}`}/>
+        </button>
+        <Portal anchorRef={aRef} open={open} onClose={()=>setOpen(false)} mxH={400}>
+            <div className="bg-white border-2 border-slate-900 rounded-3xl shadow-[6px_6px_0px_rgba(15,23,42,.7)] overflow-hidden" dir={fa?'rtl':'ltr'}>
+                <div className="flex gap-2 p-3 bg-slate-50 border-b border-slate-100">
+                    <button onClick={pickT} className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider cursor-pointer hover:bg-indigo-700 active:scale-95 transition-all">{fa?'امروز':'Today'}</button>
+                    <button onClick={pickY} className="flex-1 py-2.5 rounded-xl bg-slate-200 text-slate-700 text-xs font-black uppercase tracking-wider cursor-pointer hover:bg-slate-300 active:scale-95 transition-all">{fa?'دیروز':'Yesterday'}</button>
+                </div>
+                <div className="flex items-center justify-between p-3">
+                    <button onClick={fa?next:prev} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center cursor-pointer active:scale-90 transition-all"><ChevronRight className="w-4 h-4 text-slate-700"/></button>
+                    <span className="font-black text-slate-900 select-none">{mN[vM-1]} <span className="text-indigo-600 font-mono">{toFa(vY,lang)}</span></span>
+                    <button onClick={fa?prev:next} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center cursor-pointer active:scale-90 transition-all"><ChevronLeft className="w-4 h-4 text-slate-700"/></button>
+                </div>
+                <div className="grid grid-cols-7 px-3">{wD.map((w,i)=><div key={i} className="text-center text-[10px] font-black text-slate-400 py-1">{w}</div>)}</div>
+                <div className="grid grid-cols-7 gap-1 p-3 pt-1">
+                    {cells.map((day,i)=>{
+                        if(!day)return<div key={i}/>;
+                        const isT=vY===tY&&vM===tM&&day===tD;
+                        const isS=vY===p.y&&vM===p.m&&day===p.d;
+                        return(<button key={i} onClick={()=>pick(day)}
+                            className={`w-full aspect-square rounded-xl flex items-center justify-center text-sm font-bold cursor-pointer active:scale-90 transition-all duration-150 relative
+                                ${isS?'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-300/50 scale-105 z-10'
+                                :isT?'bg-indigo-50 text-indigo-700 border-2 border-indigo-300 font-black'
+                                :'hover:bg-slate-100 text-slate-700'}`}>
+                            {toFa(day,lang)}
+                            {isT&&!isS&&<div className="absolute bottom-0.5 w-1 h-1 rounded-full bg-indigo-500"/>}
+                        </button>);
+                    })}
+                </div>
+            </div>
+        </Portal>
+    </>);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CUSTOM SELECT
+   ═══════════════════════════════════════════════════════════════ */
+function CustomSelect({value,onChange,options,placeholder,lang,icon:Icon}){
+    const[open,setOpen]=useState(false);
+    const aRef=useRef(null);
+    const sel=options.find(o=>o.value===value);
+    return(<>
+        <button ref={aRef} type="button" onClick={()=>setOpen(!open)}
+            className="w-full flex items-center justify-between gap-3 p-3 bg-white border-2 border-slate-200 rounded-2xl font-bold text-base cursor-pointer hover:border-indigo-400 hover:shadow-lg hover:shadow-indigo-100/50 active:scale-[.98] transition-all duration-200">
+            <div className="flex items-center gap-2.5">
+                {Icon&&<div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center flex-shrink-0 shadow-md"><Icon className="w-4 h-4 text-white"/></div>}
+                <span className={sel?'text-slate-900':'text-slate-400'}>{sel?sel.label:placeholder}</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${open?'rotate-180':''}`}/>
+        </button>
+        <Portal anchorRef={aRef} open={open} onClose={()=>setOpen(false)} mxH={300}>
+            <div className="bg-white border-2 border-slate-900 rounded-2xl shadow-[6px_6px_0px_rgba(15,23,42,.7)] overflow-hidden">
+                {options.map((o,i)=>(
+                    <button key={o.value} onClick={()=>{onChange(o.value);setOpen(false)}}
+                        className={`w-full flex items-center gap-3 px-4 py-3.5 text-start cursor-pointer transition-all duration-150 active:bg-indigo-100
+                            ${i<options.length-1?'border-b border-slate-100':''}
+                            ${value===o.value?'bg-indigo-50 text-indigo-900':'hover:bg-slate-50 text-slate-700'}`}>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${value===o.value?'border-indigo-500 bg-indigo-500':'border-slate-300'}`}>
+                            {value===o.value&&<Check className="w-3 h-3 text-white" strokeWidth={3}/>}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="font-bold text-sm">{o.label}</span>
+                            {o.desc&&<span className="text-xs text-slate-400 font-medium mt-0.5">{o.desc}</span>}
+                        </div>
+                    </button>
+                ))}
+            </div>
+        </Portal>
+    </>);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INFO PANEL — reads _desc from backend, smooth expand
+   Each row manages its own state independently
+   ═══════════════════════════════════════════════════════════════ */
+function InfoPanel({hint, desc, color}){
+    const[open,setOpen]=useState(false);
+    const contentRef=useRef(null);
+    const[h,setH]=useState(0);
+
+    useEffect(()=>{
+        if(contentRef.current) setH(contentRef.current.scrollHeight);
+    },[desc,open]);
+
+    if(!desc)return <div className="ms-11 mt-1 text-xs text-slate-400 font-medium">{hint}</div>;
+
+    const cMap={
+        red:{btn:'text-red-500 hover:text-red-600',bg:'bg-red-50/80 border-red-200/60 text-red-900'},
+        amber:{btn:'text-amber-600 hover:text-amber-700',bg:'bg-amber-50/80 border-amber-200/60 text-amber-900'},
+        emerald:{btn:'text-emerald-600 hover:text-emerald-700',bg:'bg-emerald-50/80 border-emerald-200/60 text-emerald-900'},
+    };
+    const c=cMap[color]||cMap.red;
+
+    return(
+        <div className="ms-11 mt-1.5">
+            <button type="button" onClick={e=>{e.stopPropagation();setOpen(v=>!v)}}
+                className={`inline-flex items-center gap-1.5 text-xs font-bold py-0.5 px-2 rounded-lg cursor-pointer active:scale-95 transition-all duration-200 ${c.btn}`}>
+                <Info className="w-3 h-3 flex-shrink-0"/>
+                <span>{hint}</span>
+                <ChevronDown className={`w-3 h-3 transition-transform duration-400 ease-[cubic-bezier(.22,1,.36,1)] ${open?'rotate-180':''}`}/>
+            </button>
+            <div style={{height:open?h:0,opacity:open?1:0}} className="overflow-hidden transition-all duration-400 ease-[cubic-bezier(.22,1,.36,1)]" onClick={e=>e.stopPropagation()}>
+                <div ref={contentRef} className={`mt-2 p-3 rounded-xl border text-xs leading-relaxed font-medium ${c.bg}`}>{desc}</div>
+            </div>
+        </div>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PDF EXPORT — proper A4, Amiri+Vazir, page breaks, sections
+   ═══════════════════════════════════════════════════════════════ */
+function PdfModal({open,onClose,lang,patient,results,config,diseaseInd,riskFact,protFact}){
+    const r=lang==='fa';
+    const t=config?.dict?.[lang];
+    const defs=[
+        {id:'patient',label:r?'اطلاعات بیمار':'Patient Info',checked:true,icon:User,group:'main'},
+        {id:'disease',label:r?'شاخص‌های بیماری':'Disease Indicators',checked:true,icon:AlertCircle,group:'factors'},
+        {id:'risk',label:r?'عوامل خطر':'Risk Factors',checked:true,icon:Zap,group:'factors'},
+        {id:'protect',label:r?'عوامل محافظتی':'Protective',checked:true,icon:Shield,group:'factors'},
+        {id:'result',label:r?'نتیجه و امتیاز':'Result & Score',checked:true,icon:PieChart,group:'main'},
+        {id:'icdas',label:r?'جدول ICDAS':'ICDAS Table',checked:true,icon:ClipboardCheck,group:'ref'},
+        {id:'plan',label:r?'برنامه درمانی':'Action Plan',checked:true,icon:FileText,group:'main'},
+    ];
+    const[secs,setSecs]=useState(defs);
+    useEffect(()=>{if(open)setSecs(defs)},[open,lang]);
+    const toggle=id=>setSecs(p=>p.map(s=>s.id===id?{...s,checked:!s.checked}:s));
+    const groups=[{key:'main',label:r?'بخش‌های اصلی':'Main Sections'},{key:'factors',label:r?'فاکتورها':'Factors'},{key:'ref',label:r?'جداول مرجع':'Reference Tables'}];
+
+    const gen=()=>{
+        const ak=secs.filter(s=>s.checked).map(s=>s.id);
+        const rl={lowRisk:t?.lowRisk,moderateRisk:t?.moderateRisk,highRisk:t?.highRisk,extremeRisk:t?.extremeRisk};
+        const rc={lowRisk:'#059669',moderateRisk:'#d97706',highRisk:'#dc2626',extremeRisk:'#7f1d1d'};
+        const dd=(()=>{if(!patient.date)return'';const[y,m,d]=patient.date.split('-').map(Number);return r?`${toFa(d,'fa')} ${JM[m-1]} ${toFa(y,'fa')}`:`${GM[m-1]} ${d}, ${y}`})();
+
+        let h=`<!DOCTYPE html><html dir="${r?'rtl':'ltr'}" lang="${lang}"><head><meta charset="UTF-8"><title>CAMBRA Report</title>`;
+        h+=`<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&family=Amiri:wght@400;700&display=swap" rel="stylesheet">`;
+        h+=`<style>
+*{box-sizing:border-box;margin:0;padding:0}
+@page{size:A4;margin:20mm 15mm}
+body{font-family:Vazirmatn,sans-serif;color:#1e293b;font-size:13px;line-height:1.8;padding:0}
+.page{max-width:170mm;margin:0 auto;padding:8mm 0}
+h1{font-family:Amiri,serif;font-size:32px;font-weight:700;letter-spacing:-1px}
+h2{font-size:14px;font-weight:900;margin:20px 0 10px;padding:6px 12px;background:#f1f5f9;border-radius:8px;text-transform:uppercase;letter-spacing:2px;page-break-after:avoid}
+.header{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:16px;border-bottom:3px solid #0f172a;margin-bottom:20px}
+.badge{display:inline-block;padding:5px 16px;border-radius:10px;color:white;font-weight:900;font-size:15px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin:8px 0}
+.label{font-weight:700;color:#64748b;font-size:11px;text-transform:uppercase}
+.val{font-weight:700;font-size:13px}
+ul{padding-${r?'right':'left'}:16px;margin:6px 0}li{margin:3px 0;font-size:12px}
+table{width:100%;border-collapse:collapse;margin:6px 0;page-break-inside:avoid}
+th,td{border:1px solid #e2e8f0;padding:6px 10px;text-align:${r?'right':'left'};font-size:11px}
+th{background:#f1f5f9;font-weight:900;font-size:10px;text-transform:uppercase}
+.score-box{text-align:center;padding:16px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:16px;border:2px solid #e2e8f0;margin:10px 0;page-break-inside:avoid}
+.score-num{font-size:44px;font-weight:900;font-family:'Amiri',serif}
+.section{page-break-inside:avoid;margin-bottom:16px}
+.footer{margin-top:30px;padding-top:12px;border-top:2px solid #e2e8f0;text-align:center;color:#94a3b8;font-size:10px}
+.divider{height:1px;background:linear-gradient(to ${r?'left':'right'},#e2e8f0,transparent);margin:12px 0}
+@media print{.page{padding:0}}
+</style></head><body><div class="page">`;
+        h+=`<div class="header"><div><h1>CAMBRA</h1><div style="color:#64748b;font-weight:700;font-size:10px;letter-spacing:3px;margin-top:2px;text-transform:uppercase">${r?'گزارش ارزیابی ریسک پوسیدگی':'CARIES RISK ASSESSMENT REPORT'}</div></div><div style="text-align:${r?'left':'right'}"><div style="color:#64748b;font-size:11px;margin-bottom:6px">${dd}</div><span class="badge" style="background:${rc[results?.finalCat]}">${rl[results?.finalCat]||''}</span></div></div>`;
+
+        if(ak.includes('patient')){h+=`<div class="section"><h2>${r?'اطلاعات بیمار':'Patient Info'}</h2><div class="grid2"><div><span class="label">${t?.patientName}:</span> <span class="val">${patient.name}</span></div><div><span class="label">${t?.chartNo}:</span> <span class="val">${toFa(patient.chartNo,lang)}</span></div><div><span class="label">${t?.assessmentType}:</span> <span class="val">${patient.assessmentType==='baseline'?t?.baseline:t?.recall}</span></div><div><span class="label">${t?.date}:</span> <span class="val">${dd}</span></div></div></div>`;}
+
+        const mkList=(arr,pfx,title)=>{const items=arr.map((v,i)=>v?t?.[`${pfx}_${i+1}`]:null).filter(Boolean);h+=`<div class="section"><h2>${title}</h2>`;if(!items.length)h+=`<p style="color:#94a3b8;font-style:italic;font-size:12px">${r?'موردی انتخاب نشده':'None selected'}</p>`;else h+=`<ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul>`;h+=`</div>`;};
+        if(ak.includes('disease'))mkList(diseaseInd,'di',r?'شاخص‌های بیماری':'Disease Indicators');
+        if(ak.includes('risk'))mkList(riskFact,'rf',r?'عوامل خطر':'Risk Factors');
+        if(ak.includes('protect'))mkList(protFact,'pf',r?'عوامل محافظتی':'Protective Factors');
+
+        if(ak.includes('result')){h+=`<div class="section"><h2>${r?'نتیجه نهایی':'Final Result'}</h2><div class="score-box"><div class="score-num" style="color:${rc[results?.finalCat]}">${results?.score>0?'+':''}${toFa(results?.score,lang)}</div><div style="font-weight:900;font-size:18px;margin-top:6px">${rl[results?.finalCat]}</div></div></div>`;}
+
+        if(ak.includes('icdas')){h+=`<div class="section"><h2>ICDAS & ${r?'پروگزیمال':'Proximal'}</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><table><thead><tr><th>ICDAS</th><th>${r?'توضیح':'Description'}</th></tr></thead><tbody>`;[['0',r?'سطح سالم':'Sound'],['1',r?'تغییر اولیه مینا':'First enamel change'],['2',r?'ضایعه واضح مینا':'Distinct enamel lesion'],['3',r?'شکستگی موضعی مینا':'Enamel microcavity'],['4',r?'سایه عاج':'Dentin shadow'],['5',r?'حفره واضح عاج':'Dentin cavity'],['6',r?'حفره وسیع':'Extensive cavity']].forEach(([c,d])=>h+=`<tr><td style="text-align:center;font-weight:900">${toFa(c,lang)}</td><td>${d}</td></tr>`);h+=`</tbody></table><table><thead><tr><th>${r?'کد':'Code'}</th><th>${r?'محل ضایعه':'Location'}</th></tr></thead><tbody>`;[['C1',r?'نیمه خارجی مینا':'Outer half of enamel'],['C2',r?'نیمه داخلی مینا':'Inner half of enamel'],['C3',r?'یک‌سوم خارجی عاج':'Outer third of dentin'],['C4',r?'یک‌سوم میانی/داخلی عاج':'Middle/inner dentin']].forEach(([c,d])=>h+=`<tr><td style="text-align:center;font-weight:900">${c}</td><td>${d}</td></tr>`);h+=`</tbody></table></div></div>`;}
+
+        if(ak.includes('plan')){const RM={lowRisk:{d:'rec_low_diag',i:'rec_low_int'},moderateRisk:{d:'rec_mod_diag',i:'rec_mod_int'},highRisk:{d:'rec_high_diag',i:'rec_high_int'},extremeRisk:{d:'rec_ext_diag',i:'rec_ext_int'}};h+=`<div class="section" style="page-break-before:auto"><h2>${r?'برنامه درمانی':'Action Plan'}</h2><div style="margin-bottom:10px"><strong style="font-size:12px">${t?.recDiagnostics}</strong><div style="margin-top:6px;font-size:12px">${t?.[RM[results?.finalCat]?.d]||''}</div></div><div class="divider"></div><div><strong style="font-size:12px">${t?.recInterventions}</strong><div style="margin-top:6px;font-size:12px">${t?.[RM[results?.finalCat]?.i]||''}</div></div></div>`;}
+
+        h+=`<div class="footer">CAMBRA Clinical Assessment Tool — ${r?'گزارش تولید شده':'Generated Report'} — ${dd}</div>`;
+        h+=`</div></body></html>`;
+
+        const w=window.open('','_blank');w.document.write(h);w.document.close();setTimeout(()=>w.print(),500);
+        onClose();
+    };
+
+    if(!open)return null;
+    return createPortal(
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
+            <div className="c-slide-up bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl border-t-4 sm:border-4 border-slate-900 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-slate-200 sticky top-0 bg-white z-10 rounded-t-3xl">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg"><Download className="w-4 h-4 text-white"/></div>
+                        <div><h3 className="font-black text-base">{r?'خروجی گزارش':'Export Report'}</h3><p className="text-[10px] text-slate-400 font-bold">{r?'بخش‌ها را انتخاب کنید':'Configure sections'}</p></div>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center cursor-pointer active:scale-90 transition-all"><X className="w-4 h-4 text-slate-500"/></button>
+                </div>
+                <div className="p-4 space-y-4">
+                    {groups.map(g=>{
+                        const items=secs.filter(s=>s.group===g.key);
+                        if(!items.length)return null;
+                        return(<div key={g.key}>
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">{g.label}</div>
+                            <div className="space-y-1.5">
+                                {items.map(sec=>(
+                                    <button key={sec.id} onClick={()=>toggle(sec.id)}
+                                        className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all cursor-pointer active:scale-[.98]
+                                            ${sec.checked?'border-indigo-300 bg-indigo-50/60':'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                                        <div className={`w-5 h-5 rounded-lg flex items-center justify-center transition-all ${sec.checked?'bg-indigo-600':'bg-slate-200'}`}>
+                                            {sec.checked&&<Check className="w-3 h-3 text-white" strokeWidth={3}/>}
+                                        </div>
+                                        <sec.icon className={`w-3.5 h-3.5 ${sec.checked?'text-indigo-600':'text-slate-400'}`}/>
+                                        <span className={`font-bold text-sm ${sec.checked?'text-slate-900':'text-slate-500'}`}>{sec.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>);
+                    })}
+                </div>
+                <div className="p-4 pt-0 pb-5">
+                    <button onClick={gen} disabled={!secs.some(s=>s.checked)}
+                        className="group relative w-full cursor-pointer active:scale-95 transition-transform disabled:opacity-40">
+                        <div className="absolute inset-0 bg-indigo-800 rounded-2xl translate-y-1"/>
+                        <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3.5 rounded-2xl font-black flex items-center justify-center gap-2 group-hover:translate-y-0.5 transition-transform">
+                            <FileText className="w-4 h-4"/>{r?'تولید و چاپ':'Generate & Print'}
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>,document.body);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   WELCOME — compact, no scroll, warm professional
+   ═══════════════════════════════════════════════════════════════ */
+function Welcome({lang,onStart}){
+    const r=lang==='fa';
+    return(
+        <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-200px)] px-4 py-4">
+            <div className="w-full max-w-md flex flex-col items-center gap-4">
+                {/* Compact logo+title */}
+                <div className="c-fade flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center shadow-xl c-float">
+                        <HeartPulse className="w-6 h-6 text-white" strokeWidth={1.5}/>
+                    </div>
+                    <div className="text-start">
+                        <h1 className="text-3xl font-black tracking-tighter text-slate-900 leading-none">CAMBRA</h1>
+                        <p className="text-[10px] font-black uppercase tracking-[.12em] text-indigo-500 mt-0.5">
+                            {r?'سامانه هوشمند ارزیابی ریسک پوسیدگی':'Smart Caries Risk Assessment'}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Description */}
+                <div className="c-fade c-d1 w-full bg-white border-2 border-slate-200 rounded-2xl p-4 text-start">
+                    <p className="text-[13px] text-slate-600 font-medium leading-relaxed">
+                        {r
+                            ?<>این ابزار بر پایه پروتکل <strong className="text-slate-900">CAMBRA</strong> طراحی شده و ارزیابی ریسک پوسیدگی را <strong className="text-indigo-600">ساده‌تر و دقیق‌تر</strong> می‌کند. اطلاعات بیمار را وارد کنید، فاکتورها را بررسی کنید و برنامه درمانی اختصاصی دریافت کنید.</>
+                            :<>Built on the <strong className="text-slate-900">CAMBRA</strong> protocol, this tool makes caries risk assessment <strong className="text-indigo-600">faster and more precise</strong>. Enter patient data, review factors, and receive a personalized treatment plan.</>
+                        }
+                    </p>
+                </div>
+
+                {/* CTA */}
+                <button onClick={onStart} className="c-fade c-d2 group relative cursor-pointer active:scale-95 transition-transform w-full c-glow rounded-2xl">
+                    <div className="absolute inset-0 bg-indigo-800 rounded-2xl translate-y-1.5"/>
+                    <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-2 border-indigo-500 py-3.5 rounded-2xl font-black text-base flex items-center justify-center gap-3 group-hover:translate-y-0.5 transition-transform shadow-lg">
+                        <Sparkles className="w-4 h-4"/>
+                        {r?'شروع ارزیابی':'Start Assessment'}
+                        <ChevronRight className={`w-4 h-4 ${r?'rotate-180':''}`}/>
+                    </div>
+                </button>
+
+                <p className="c-fade c-d3 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                    {r?'ویژه بیماران ۶ سال و بالاتر':'For patients aged 6+'}
+                </p>
+            </div>
+        </div>
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN APP
+   ═══════════════════════════════════════════════════════════════ */
+const ADMIN_KEY='cambra_admin_2026';
+
+export default function CambraApp(){
+    const[lang,setLang]=useState('fa');
+    const[activeTab,setActiveTab]=useState('welcome');
+    const[isSubmitting,setIsSubmitting]=useState(false);
+    const[config,setConfig]=useState(null);
+    const[showPdf,setShowPdf]=useState(false);
+    const isAdmin=useMemo(()=>typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('admin')===ADMIN_KEY,[]);
+
+    const initDate=l=>{const d=new Date();if(l==='fa'){const j=g2j(d.getFullYear(),d.getMonth()+1,d.getDate());return ds(j.jy,j.jm,j.jd)}return ds(d.getFullYear(),d.getMonth()+1,d.getDate())};
+
+    const[patient,setPatient]=useState({name:'',chartNo:'',date:initDate('fa'),assessmentType:'baseline'});
+    const[diseaseInd,setDiseaseInd]=useState([]);
+    const[riskFact,setRiskFact]=useState([]);
+    const[protFact,setProtFact]=useState([]);
+    const[appAlert,setAppAlert]=useState({show:false,message:'',type:'info',onClose:null});
+
+    // Convert date on lang switch
+    useEffect(()=>{
+        setPatient(prev=>{
+            if(!prev.date)return prev;
+            const[y,m,d]=prev.date.split('-').map(Number);
+            if(lang==='fa'&&y>1500){const j=g2j(y,m,d);return{...prev,date:ds(j.jy,j.jm,j.jd)}}
+            if(lang==='en'&&y<1500){const g=j2g(y,m,d);return{...prev,date:ds(g.gy,g.gm,g.gd)}}
+            return prev;
+        });
+    },[lang]);
+
+    useEffect(()=>{
+        fetch('https://attendance.rlh.ir/appliance_survey/api/cambra/config')
+            .then(r=>r.json()).then(data=>{
+                setConfig(data);const s=data.settings;
+                setDiseaseInd(new Array(s.diseaseCount).fill(false));
+                setRiskFact(new Array(s.riskCount).fill(false));
+                setProtFact(new Array(s.protectiveCount).fill(false));
+            }).catch(console.error);
+    },[]);
+
+    useEffect(()=>{window.scrollTo({top:0,behavior:'smooth'})},[activeTab]);
+
+    const results=useMemo(()=>{
+        if(!config)return null;const s=config.settings;
+        const dC=diseaseInd.filter(Boolean).length,rC=riskFact.filter(Boolean).length,pC=protFact.filter(Boolean).length;
+        const dS=dC*s.diseaseWeight,rS=rC*s.riskWeight,pS=pC*s.protectiveWeight,sc=(dS+rS)-pS;
+        let b='lowRisk';if(sc>=s.extremeMin)b='extremeRisk';else if(sc>=s.modMax+1)b='highRisk';else if(sc>=s.lowMax+1)b='moderateRisk';
+        let f=b,dO=false,eO=false,oO=false;
+        if(riskFact[7]&&b==='lowRisk'){f='moderateRisk';oO=true}
+        if(dC>0&&(f==='lowRisk'||f==='moderateRisk')){f='highRisk';dO=true;oO=false}
+        const hH=riskFact[1]||riskFact[4];
+        if(f==='highRisk'&&hH){f='extremeRisk';eO=true;dO=false}
+        return{dCount:dC,rCount:rC,pCount:pC,dScore:dS,rScore:rS,pScore:pS,score:sc,finalCat:f,dOverride:dO,eOverride:eO,orthoOverride:oO,hasHyposalivation:hH};
+    },[diseaseInd,riskFact,protFact,config]);
+
+    const tabOrder=['welcome','patient','disease','protective','results'];
+    const isValid=id=>id==='patient'?patient.name.length>0&&patient.chartNo.length>0:true;
+    const toggle=(setter,idx)=>setter(p=>{const n=[...p];n[idx]=!n[idx];return n});
+    const genChart=()=>{const r=Math.floor(1000+Math.random()*9000);const d=new Date();setPatient(p=>({...p,chartNo:`CMB-${String(d.getFullYear()).slice(-2)}${String(d.getMonth()+1).padStart(2,'0')}-${r}`}))};
+
+    const reset=()=>{
+        setPatient({name:'',chartNo:'',date:initDate(lang),assessmentType:'baseline'});
+        if(config){const s=config.settings;setDiseaseInd(new Array(s.diseaseCount).fill(false));setRiskFact(new Array(s.riskCount).fill(false));setProtFact(new Array(s.protectiveCount).fill(false))}
+        setActiveTab('welcome');
+    };
+
+    const submit=async()=>{
+        setIsSubmitting(true);
+        try{
+            const cd=config.dict[lang];
+            const gl=(arr,pfx)=>arr.map((v,i)=>v?cd[`${pfx}_${i+1}`]:null).filter(Boolean);
+            let sd=patient.date;
+            if(lang==='fa'&&patient.date){const[y,m,d]=patient.date.split('-').map(Number);if(y<1500){const g=j2g(y,m,d);sd=ds(g.gy,g.gm,g.gd)}}
+            const payload={patient_name:patient.name,chart_no:patient.chartNo,assessment_type:patient.assessmentType,disease_ind:JSON.stringify(gl(diseaseInd,'di')),risk_fact:JSON.stringify(gl(riskFact,'rf')),prot_fact:JSON.stringify(gl(protFact,'pf')),severe_hypo:results.hasHyposalivation.toString(),net_score:results.score,final_category:results.finalCat,raw_data:JSON.stringify({patient:{...patient,date:sd},diseaseInd,riskFact,protFact})};
+            const res=await fetch('https://attendance.rlh.ir/appliance_survey/api/cambra/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+            if(res.ok)setAppAlert({show:true,message:lang==='fa'?'با موفقیت ثبت شد!':'Submitted!',type:'success',onClose:reset});
+            else setAppAlert({show:true,message:lang==='fa'?'خطا':'Error',type:'error'});
+        }catch{setAppAlert({show:true,message:lang==='fa'?'اینترنت را بررسی کنید':'Check internet',type:'error'})}
+        setIsSubmitting(false);
+    };
+
+    if(!config)return<div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-slate-50"><div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"/><span className="font-bold text-sm text-slate-400">Loading...</span></div>;
+
+    const t=config.dict[lang],isRtl=lang==='fa',stg=config.settings,isW=activeTab==='welcome';
+
+    const headerTabs=[
+        {id:'patient',icon:User,label:t.tabPatient},
+        {id:'disease',icon:AlertCircle,label:t.tabDisease},
+        {id:'protective',icon:Shield,label:t.tabProtective},
+        {id:'results',icon:PieChart,label:t.tabResults},
+    ];
+
+    const CatBg={extremeRisk:'bg-gradient-to-br from-red-800 to-red-950',highRisk:'bg-gradient-to-br from-red-500 to-red-700',moderateRisk:'bg-gradient-to-br from-amber-400 to-orange-500',lowRisk:'bg-gradient-to-br from-emerald-500 to-teal-600'};
+    const RecMap={lowRisk:{d:'rec_low_diag',i:'rec_low_int'},moderateRisk:{d:'rec_mod_diag',i:'rec_mod_int'},highRisk:{d:'rec_high_diag',i:'rec_high_int'},extremeRisk:{d:'rec_ext_diag',i:'rec_ext_int'}};
+
+    /* DataRow — uses _desc from backend for InfoPanel */
+    const DataRow=({prefix,idx,checked,onToggle,color,weight})=>{
+        const label=t[`${prefix}_${idx+1}`];
+        const hint=t[`${prefix}_${idx+1}_hint`];
+        const desc=t[`${prefix}_${idx+1}_desc`];
+        const ac={red:'from-red-500 to-rose-600',amber:'from-amber-400 to-orange-500',emerald:'from-emerald-400 to-teal-500'}[color];
+        const hc={red:'hover:bg-red-50/40',amber:'hover:bg-amber-50/40',emerald:'hover:bg-emerald-50/40'}[color];
+        const wSign=color==='emerald'?'-':'+';
+
+        return(
+            <div className={`flex flex-col py-3.5 px-4 sm:px-5 border-b border-slate-100 transition-colors duration-200 cursor-pointer select-none active:bg-slate-100 ${checked?'bg-slate-50/80':`bg-white ${hc}`}`}
+                onClick={()=>onToggle(idx)}>
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className={`flex-shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-300 ${checked?`bg-gradient-to-r ${ac} border-transparent shadow-md`:'border-slate-300 bg-white'}`}>
+                            <Check className={`w-3.5 h-3.5 text-white transition-all duration-300 ${checked?'opacity-100 scale-100':'opacity-0 scale-75'}`} strokeWidth={3}/>
+                        </div>
+                        <span className={`text-sm font-bold leading-snug transition-colors ${checked?'text-slate-900':'text-slate-600'}`}>{label}</span>
+                    </div>
+                    {checked&&(
+                        <span className={`text-xs font-black bg-gradient-to-r ${ac} text-white px-2 py-0.5 rounded-lg shadow-sm`} dir="ltr">
+                            {wSign}{toFa(weight,lang)}
+                        </span>
+                    )}
+                </div>
+                <InfoPanel hint={hint} desc={desc} color={color}/>
+            </div>
+        );
+    };
+
+    // Results page date display
+    const dateDisp=(()=>{if(!patient.date)return'';const[y,m,d]=patient.date.split('-').map(Number);return isRtl?`${toFa(d,'fa')} ${JM[m-1]} ${toFa(y,'fa')}`:`${GM[m-1]} ${d}, ${y}`})();
+
+    return(
+        <div dir={isRtl?'rtl':'ltr'} className={`min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/80 text-slate-900 font-sans ${isW?'':'pb-16'} ${isRtl?'font-arabic':''}`}>
+
+            {/* HEADER */}
+            <header className="bg-white/80 backdrop-blur-xl border-b border-slate-200/80 px-4 py-2 sticky top-0 z-30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-slate-800 to-slate-950 text-white rounded-xl flex items-center justify-center shadow-md"><Activity className="w-3.5 h-3.5"/></div>
+                    <div><h1 className="font-black text-sm text-slate-900 leading-tight">{t.title}</h1><span className="text-[8px] font-black text-slate-400 uppercase tracking-[.15em]">{t.subtitle}</span></div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    {isAdmin&&<a href="/appliance_survey/admin-cambra-789" target="_blank" className="w-8 h-8 rounded-xl bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center cursor-pointer active:scale-90 transition-all border border-indigo-200"><Settings className="w-3.5 h-3.5 text-indigo-600"/></a>}
+                    <button onClick={()=>setLang(lang==='en'?'fa':'en')} className="h-8 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold cursor-pointer active:scale-95 transition-all border border-slate-200">{t.language}</button>
+                </div>
+            </header>
+
+            {/* TAB BAR */}
+            {!isW&&<div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/80 sticky top-[42px] z-20"><div className="max-w-3xl mx-auto flex">
+                {headerTabs.map(tab=>(
+                    <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
+                        className={`flex-1 flex flex-col items-center gap-0.5 py-2 px-1 text-[10px] font-bold border-b-2 transition-all cursor-pointer
+                            ${activeTab===tab.id?'border-slate-900 text-slate-900':'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                        <tab.icon className={`w-3.5 h-3.5 ${activeTab===tab.id?'text-slate-900':'text-slate-300'}`}/>
+                        {tab.label}
+                    </button>
+                ))}
+            </div></div>}
+
+            {/* MAIN */}
+            <main className="max-w-3xl mx-auto p-4 md:p-6">
+                {isW&&<Welcome lang={lang} onStart={()=>setActiveTab('patient')}/>}
+                <div className={isW?'hidden':'space-y-6'}>
+
+                    {/* PATIENT */}
+                    <div className={activeTab!=='patient'?'hidden':''}>
+                        <div className="c-fade bg-white rounded-3xl border-2 border-slate-200 overflow-visible shadow-sm">
+                            <div className="bg-gradient-to-r from-slate-50 to-slate-100 px-5 py-3 border-b border-slate-200 rounded-t-3xl">
+                                <h2 className="text-xs font-black text-slate-700 uppercase tracking-widest">{t.patientInfo}</h2>
+                            </div>
+                            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                {/* Name */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t.patientName}</label>
+                                    <div className="relative">
+                                        <div className="absolute top-1/2 -translate-y-1/2 start-3 w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center"><User className="w-3.5 h-3.5 text-slate-500"/></div>
+                                        <input type="text" value={patient.name} onChange={e=>setPatient(p=>({...p,name:e.target.value}))}
+                                            className="w-full text-base font-bold ps-13 pe-4 py-3 border-2 border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:shadow-lg focus:shadow-indigo-100/50 transition-all"
+                                            placeholder={isRtl?'نام بیمار...':'Patient name...'}/>
+                                    </div>
+                                </div>
+                                {/* Chart — numbers stay as-is, display converted */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t.chartNo}</label>
+                                    <div className="relative">
+                                        <div className="absolute top-1/2 -translate-y-1/2 start-3 w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center"><ClipboardCheck className="w-3.5 h-3.5 text-slate-500"/></div>
+                                        <input type="text" value={patient.chartNo}
+                                            onChange={e=>setPatient(p=>({...p,chartNo:e.target.value}))}
+                                            className="w-full text-base font-bold ps-13 pe-12 py-3 border-2 border-slate-200 rounded-2xl outline-none focus:border-indigo-400 focus:shadow-lg focus:shadow-indigo-100/50 transition-all font-mono"
+                                            placeholder={isRtl?'شماره پرونده...':'Chart #...'}
+                                            dir="ltr"/>
+                                        <button onClick={genChart} type="button" className="absolute top-1/2 -translate-y-1/2 end-2 w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center cursor-pointer active:scale-90 transition-all shadow-md">
+                                            <Shuffle className="w-3.5 h-3.5 text-white"/>
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* Date */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t.date}</label>
+                                    <CalendarPicker value={patient.date} onChange={v=>setPatient(p=>({...p,date:v}))} lang={lang}/>
+                                </div>
+                                {/* Type */}
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t.assessmentType}</label>
+                                    <CustomSelect value={patient.assessmentType} onChange={v=>setPatient(p=>({...p,assessmentType:v}))}
+                                        options={[{value:'baseline',label:t.baseline,desc:isRtl?'اولین ارزیابی':'First assessment'},{value:'recall',label:t.recall,desc:isRtl?'پیگیری':'Follow-up'}]}
+                                        placeholder={isRtl?'انتخاب...':'Select...'} lang={lang} icon={ClipboardCheck}/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* DISEASE/RISK */}
+                    <div className={`${activeTab!=='disease'?'hidden':''} space-y-6`}>
+                        <div className="c-fade bg-white rounded-3xl border-2 border-slate-200 overflow-hidden shadow-sm">
+                            <div className="bg-gradient-to-r from-red-50 to-rose-50 border-b border-red-100 px-5 py-3">
+                                <h2 className="text-xs font-black text-red-800 uppercase tracking-widest">{t.diseaseIndicators}</h2>
+                                <p className="text-[10px] text-red-500 mt-0.5 font-bold">{t.diseaseIndSubtitle}</p>
+                            </div>
+                            {Array.from({length:stg.diseaseCount}).map((_,i)=>
+                                <DataRow key={`di${i}`} prefix="di" idx={i} checked={diseaseInd[i]} onToggle={x=>toggle(setDiseaseInd,x)} color="red" weight={stg.diseaseWeight}/>
+                            )}
+                        </div>
+                        <div className="c-fade c-d1 bg-white rounded-3xl border-2 border-slate-200 overflow-hidden shadow-sm">
+                            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100 px-5 py-3">
+                                <h2 className="text-xs font-black text-amber-800 uppercase tracking-widest">{t.riskFactors}</h2>
+                                <p className="text-[10px] text-amber-600 mt-0.5 font-bold">{t.riskFactSubtitle}</p>
+                            </div>
+                            {Array.from({length:stg.riskCount}).map((_,i)=>
+                                <DataRow key={`rf${i}`} prefix="rf" idx={i} checked={riskFact[i]} onToggle={x=>toggle(setRiskFact,x)} color="amber" weight={stg.riskWeight}/>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* PROTECTIVE */}
+                    <div className={activeTab!=='protective'?'hidden':''}>
+                        <div className="c-fade bg-white rounded-3xl border-2 border-slate-200 overflow-hidden shadow-sm">
+                            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 px-5 py-3">
+                                <h2 className="text-xs font-black text-emerald-800 uppercase tracking-widest">{t.protectiveFactors}</h2>
+                                <p className="text-[10px] text-emerald-600 mt-0.5 font-bold">{t.protFactSubtitle}</p>
+                            </div>
+                            {Array.from({length:stg.protectiveCount}).map((_,i)=>
+                                <DataRow key={`pf${i}`} prefix="pf" idx={i} checked={protFact[i]} onToggle={x=>toggle(setProtFact,x)} color="emerald" weight={stg.protectiveWeight}/>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* RESULTS */}
+                    <div className={`${activeTab!=='results'?'hidden':'block'} space-y-5 pb-12`}>
+                        {/* Main result card */}
+                        <div className="c-fade relative w-full">
+                            <div className="relative w-full rounded-3xl border-4 border-slate-900 shadow-[8px_8px_0px_#0f172a] hover:shadow-[3px_3px_0px_#0f172a] hover:translate-x-1 hover:translate-y-1 transition-all duration-300 flex flex-col md:flex-row overflow-hidden bg-white cursor-default">
+                                <div className={`relative flex-1 p-6 sm:p-8 flex flex-col justify-center overflow-hidden ${CatBg[results.finalCat]}`}>
+                                    <div className="absolute inset-0 opacity-[.08] pointer-events-none" style={{backgroundImage:'radial-gradient(rgba(255,255,255,.4) 1px, transparent 1px)',backgroundSize:'16px 16px'}}/>
+                                    <Shield className="absolute -right-10 -bottom-10 w-52 h-52 opacity-[.05] text-white rotate-12 pointer-events-none" strokeWidth={1}/>
+                                    <div className="relative z-10">
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 border border-white/20 rounded-full text-[9px] font-black uppercase tracking-[.15em] text-white/80 mb-4 backdrop-blur-sm">
+                                            <Activity className="w-2.5 h-2.5"/>{isRtl?'نتیجه آنالیز':'VERDICT'}
+                                        </div>
+                                        <h2 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter leading-[.85] text-white drop-shadow-[3px_3px_0_rgba(0,0,0,.25)]">{t[results.finalCat]}</h2>
+                                    </div>
+                                </div>
+                                <div className="w-full md:w-[220px] bg-slate-900 text-white p-5 flex flex-col justify-between border-t-4 md:border-t-0 md:border-l-4 border-slate-800 relative">
+                                    <div className="relative z-10 mb-4">
+                                        <span className="text-[9px] font-black uppercase tracking-[.2em] text-slate-500 flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse"/>{isRtl?'نمره':'SCORE'}
+                                        </span>
+                                        <div className="flex items-end gap-1.5 mt-2" dir="ltr">
+                                            <span className="text-5xl font-black font-mono leading-none tracking-tighter">{results.score>0?'+':''}{toFa(results.score,lang)}</span>
+                                        </div>
+                                        {patient.date&&<div className="mt-2 flex items-center gap-1 text-slate-500 text-[10px] font-bold" dir={isRtl?'rtl':'ltr'}><Calendar className="w-2.5 h-2.5"/>{dateDisp}</div>}
+                                    </div>
+                                    <div className="relative z-10">
+                                        {results.hasHyposalivation?(
+                                            <div className="bg-red-500/90 text-white border border-red-300/40 p-2.5 rounded-xl">
+                                                <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest mb-0.5 opacity-80"><Droplets className="w-2.5 h-2.5"/>{isRtl?'بحرانی':'CRITICAL'}</span>
+                                                <span className="font-bold text-xs block">{isRtl?'نقص بزاق':'HYPOSALIVATION'}</span>
+                                            </div>
+                                        ):(
+                                            <div className="bg-slate-800/60 text-slate-500 border border-slate-700/50 p-2.5 rounded-xl border-dashed">
+                                                <span className="flex items-center gap-1 text-[8px] font-black uppercase tracking-widest mb-0.5 opacity-50"><Droplets className="w-2.5 h-2.5"/>{isRtl?'وضعیت':'STATUS'}</span>
+                                                <span className="font-bold text-xs block opacity-50">{isRtl?'نرمال':'NORMAL'}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Score summary — compact inline */}
+                        <div className="c-fade c-d1 flex flex-wrap gap-3">
+                            {[
+                                {k:'di',sc:results.dScore,s:'+',bg:'from-red-500 to-rose-600',lb:isRtl?'پاتولوژی':'Pathology',ic:Stethoscope,items:diseaseInd.map((c,i)=>c?t[`di_${i+1}`]:null).filter(Boolean)},
+                                {k:'rf',sc:results.rScore,s:'+',bg:'from-amber-400 to-orange-500',lb:isRtl?'ریسک':'Risk',ic:Zap,items:riskFact.map((c,i)=>c?t[`rf_${i+1}`]:null).filter(Boolean)},
+                                {k:'pf',sc:results.pScore,s:'-',bg:'from-emerald-400 to-teal-500',lb:isRtl?'محافظت':'Protection',ic:ShieldCheck,items:protFact.map((c,i)=>c?t[`pf_${i+1}`]:null).filter(Boolean)},
+                            ].map(st=>(
+                                <div key={st.k} className="flex-1 min-w-[140px] bg-white rounded-2xl border-2 border-slate-200 p-3 hover:shadow-md transition-all cursor-default">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-7 h-7 rounded-xl bg-gradient-to-br ${st.bg} flex items-center justify-center text-white shadow-sm`}><st.ic className="w-3.5 h-3.5"/></div>
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{st.lb}</span>
+                                        </div>
+                                        <span className={`font-mono font-black text-lg bg-gradient-to-r ${st.bg} bg-clip-text text-transparent`} dir="ltr">{st.s}{toFa(st.sc,lang)}</span>
+                                    </div>
+                                    {st.items.length>0?(
+                                        <div className="flex flex-wrap gap-1">{st.items.map((item,i)=>(
+                                            <span key={i} className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">{item}</span>
+                                        ))}</div>
+                                    ):<span className="text-[9px] text-slate-300 font-bold">—</span>}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* ICDAS + C — compact side by side inline */}
+                        <div className="c-fade c-d2 bg-white rounded-2xl border-2 border-slate-200 overflow-hidden">
+                            <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-widest">ICDAS & {isRtl?'پروگزیمال':'Proximal'}</span>
+                            </div>
+                            <div className="grid grid-cols-2 divide-x divide-slate-100">
+                                <div className="px-3 py-2">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {[['0',isRtl?'سالم':'Sound'],['1',isRtl?'مینا اولیه':'Early enamel'],['2',isRtl?'مینا واضح':'Distinct enamel'],['3',isRtl?'میکروکویتی':'Microcavity'],['4',isRtl?'سایه عاج':'Shadow'],['5',isRtl?'حفره':'Cavity'],['6',isRtl?'وسیع':'Extensive']].map(([c,d])=>(
+                                            <div key={c} className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1">
+                                                <span className="w-5 h-5 rounded-md bg-slate-900 text-white flex items-center justify-center font-black text-[9px]">{toFa(c,lang)}</span>
+                                                <span className="text-[9px] font-bold text-slate-600">{d}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="px-3 py-2">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {[['C1',isRtl?'مینا خارجی':'Outer enamel'],['C2',isRtl?'مینا داخلی':'Inner enamel'],['C3',isRtl?'عاج خارجی':'Outer dentin'],['C4',isRtl?'عاج داخلی':'Inner dentin']].map(([c,d])=>(
+                                            <div key={c} className="flex items-center gap-1.5 bg-slate-50 rounded-lg px-2 py-1">
+                                                <span className="w-6 h-5 rounded-md bg-indigo-600 text-white flex items-center justify-center font-black text-[9px]">{c}</span>
+                                                <span className="text-[9px] font-bold text-slate-600">{d}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Overrides */}
+                        {(results.dOverride||results.eOverride)&&(
+                            <div className="flex flex-wrap gap-3">
+                                {results.dOverride&&<div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-r-xl flex-1 min-w-[200px]"><span className="text-red-600 font-black text-[10px] uppercase flex items-center gap-1"><ArrowUpRight className="w-3 h-3"/>{t.diseaseOverride}</span></div>}
+                                {results.eOverride&&<div className="bg-slate-900 text-white p-3 rounded-xl flex-1 min-w-[200px]"><span className="text-emerald-400 font-black text-[10px] uppercase flex items-center gap-1"><Zap className="w-3 h-3"/>{t.extremeOverride}</span></div>}
+                            </div>
+                        )}
+
+                        {/* Action Plan */}
+                        <div className="c-fade c-d3 space-y-3">
+                            <div className="flex items-center gap-2 px-1"><ClipboardCheck className="w-4 h-4 text-indigo-600"/><h3 className="font-black text-slate-900 uppercase tracking-widest text-xs">{isRtl?'برنامه درمانی':'ACTION PLAN'}</h3><div className="flex-1 h-px bg-slate-200"/></div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden hover:shadow-md transition-all">
+                                    <div className="bg-slate-50 border-b border-slate-200 p-3 flex items-center gap-2"><Calendar className="w-3.5 h-3.5 text-slate-400"/><span className="font-black text-[10px] text-slate-500 uppercase tracking-wider">{t.recDiagnostics}</span></div>
+                                    <div className="p-4"><div dangerouslySetInnerHTML={{__html:t[RecMap[results.finalCat].d]}} className="text-sm text-slate-700 leading-relaxed space-y-2"/></div>
+                                </div>
+                                <div className="bg-white rounded-2xl border-2 border-slate-900 overflow-hidden hover:shadow-md transition-all">
+                                    <div className="bg-slate-900 p-3 flex items-center justify-between"><span className="font-black text-[10px] text-indigo-300 uppercase tracking-wider flex items-center gap-2"><Zap className="w-3.5 h-3.5"/>{t.recInterventions}</span><div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"/></div>
+                                    <div className="p-4"><div dangerouslySetInnerHTML={{__html:t[RecMap[results.finalCat].i]}} className="text-sm text-slate-700 leading-relaxed space-y-2"/></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+                            <button onClick={()=>setShowPdf(true)} className="group relative cursor-pointer active:scale-95 transition-transform w-full sm:w-auto">
+                                <div className="absolute inset-0 bg-slate-700 rounded-xl translate-y-1"/>
+                                <div className="relative bg-slate-800 text-white px-6 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 group-hover:translate-y-0.5 transition-transform"><Download className="w-4 h-4"/>{isRtl?'ذخیره PDF':'Save PDF'}</div>
+                            </button>
+                            <button onClick={submit} disabled={isSubmitting} className="group relative cursor-pointer active:scale-95 transition-transform disabled:opacity-50 w-full sm:w-auto">
+                                <div className="absolute inset-0 bg-indigo-800 rounded-xl translate-y-1"/>
+                                <div className="relative bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 group-hover:translate-y-0.5 transition-transform shadow-lg shadow-indigo-300/20">
+                                    {isSubmitting?<Activity className="animate-spin w-4 h-4"/>:<ClipboardCheck className="w-4 h-4"/>}
+                                    {isSubmitting?(isRtl?'ثبت...':'SAVING...'):(isRtl?'ثبت و خروج':'FINISH & LOG')}
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            {/* NAV */}
+            {!isW&&<nav className="fixed bottom-2 left-1/2 -translate-x-1/2 w-[calc(100%-1rem)] max-w-lg z-40 pointer-events-none">
+                <div className="bg-white/90 backdrop-blur-xl border-2 border-slate-900 rounded-xl px-1.5 py-0.5 flex items-center justify-between gap-1 pointer-events-auto shadow-[3px_3px_0px_#0f172a]">
+                    <button disabled={tabOrder.indexOf(activeTab)<=1} onClick={()=>setActiveTab(tabOrder[tabOrder.indexOf(activeTab)-1])}
+                        className={`flex-shrink-0 w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center disabled:opacity-20 cursor-pointer active:scale-90 transition-all ${tabOrder.indexOf(activeTab)<=1?'invisible':''}`}>
+                        <ChevronLeft className={`w-3.5 h-3.5 text-slate-800 ${isRtl?'scale-x-[-1]':''}`} strokeWidth={3}/>
+                    </button>
+                    <div className="flex flex-1 justify-center gap-1">
+                        {tabOrder.filter(x=>x!=='welcome').map((tab,idx)=>{const ci=tabOrder.indexOf(activeTab)-1;return(
+                            <div key={tab} className={`transition-all duration-400 ease-[cubic-bezier(.22,1,.36,1)] rounded-full border border-slate-900 ${idx===ci?'w-4 h-1.5 bg-indigo-500':idx<ci?'w-1.5 h-1.5 bg-slate-900':'w-1.5 h-1.5 bg-slate-300'}`}/>
+                        )})}
+                    </div>
+                    <button disabled={tabOrder.indexOf(activeTab)===tabOrder.length-1||!isValid(activeTab)} onClick={()=>setActiveTab(tabOrder[tabOrder.indexOf(activeTab)+1])}
+                        className={`flex-shrink-0 w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center disabled:opacity-20 cursor-pointer active:scale-90 transition-all ${tabOrder.indexOf(activeTab)===tabOrder.length-1?'invisible':''}`}>
+                        <ChevronRight className={`w-3.5 h-3.5 text-slate-800 ${isRtl?'scale-x-[-1]':''}`} strokeWidth={3}/>
+                    </button>
+                </div>
+            </nav>}
+
+            <PdfModal open={showPdf} onClose={()=>setShowPdf(false)} lang={lang} patient={patient} results={results} config={config} diseaseInd={diseaseInd} riskFact={riskFact} protFact={protFact}/>
+
+            {appAlert.show&&createPortal(
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="c-scale bg-white border-4 border-slate-900 shadow-[8px_8px_0_rgba(0,0,0,1)] w-full max-w-sm p-6 text-center rounded-3xl">
+                        <div className="mb-4">
+                            {appAlert.type==='success'?<div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto border-4 border-emerald-500"><Check className="w-7 h-7" strokeWidth={4}/></div>
+                            :<div className="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto border-4 border-red-500"><AlertCircle className="w-7 h-7" strokeWidth={4}/></div>}
+                        </div>
+                        <h3 className="text-lg font-black uppercase tracking-widest mb-3">{appAlert.type==='success'?(isRtl?'موفقیت':'SUCCESS'):(isRtl?'خطا':'ERROR')}</h3>
+                        <p className="text-slate-600 font-bold mb-5">{appAlert.message}</p>
+                        <button onClick={()=>{if(appAlert.onClose)appAlert.onClose();setAppAlert(a=>({...a,show:false,onClose:null}))}}
+                            className="w-full py-3 bg-slate-900 text-white font-black uppercase tracking-widest rounded-xl hover:bg-slate-700 cursor-pointer active:scale-95 transition-all">
+                            {isRtl?'باشه':'OK'}
+                        </button>
+                    </div>
+                </div>,document.body
+            )}
+        </div>
+    );
+}
