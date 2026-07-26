@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-    Globe, Activity, User, Check, AlertCircle, Shield, PieChart, Save, ChevronLeft, ChevronRight
+    Globe, Activity, User, Check, AlertCircle, Shield, PieChart, Save, ChevronLeft, ChevronRight, Zap, Scale, Stethoscope, ShieldCheck, ClipboardCheck, Calendar, ArrowUpRight, Droplets
 } from 'lucide-react';
 
 export default function CambraApp() {
@@ -24,7 +24,7 @@ export default function CambraApp() {
     const setActiveModal = modalTuple.at(1);
 
     // Add this state to your list of states
-    const [appAlert, setAppAlert] = useState({ show: false, message: '', type: 'info' });
+    const [appAlert, setAppAlert] = useState({ show: false, message: '', type: 'info', onClose: null });
 
 
     useEffect(() => {
@@ -39,6 +39,11 @@ export default function CambraApp() {
             })
             .catch(err => console.error(err));
     }, Array.of());
+
+    // Auto-scroll to top when navigating between tabs
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [activeTab]);
 
     const calcDeps = Array.of(diseaseInd, riskFact, protFact, config);
 
@@ -104,6 +109,26 @@ export default function CambraApp() {
         });
     };
 
+    const resetForm = () => {
+        // Reset Patient Data
+        setPatient({
+            name: '',
+            chartNo: '',
+            date: new Date().toISOString().split('T').at(0),
+            assessmentType: 'baseline'
+        });
+
+        // Reset Checkboxes
+        const settings = Reflect.get(config, 'settings');
+        setDiseaseInd(new Array(Reflect.get(settings, 'diseaseCount')).fill(false));
+        setRiskFact(new Array(Reflect.get(settings, 'riskCount')).fill(false));
+        setProtFact(new Array(Reflect.get(settings, 'protectiveCount')).fill(false));
+
+        // Send back to first tab
+        setActiveTab('patient');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     const submitToServer = async () => {
         setIsSubmitting(true);
         try {
@@ -143,7 +168,8 @@ export default function CambraApp() {
                 setAppAlert({
                     show: true,
                     message: lang === 'fa' ? 'با موفقیت ثبت شد!' : 'Submitted successfully!',
-                    type: 'success'
+                    type: 'success',
+                    onClose: resetForm // <--- Attach it here!
                 });
             } else {
                 setAppAlert({
@@ -303,21 +329,59 @@ export default function CambraApp() {
                                 <h2 className="text-sm font-bold text-slate-700 uppercase tracking-widest">{Reflect.get(t, 'patientInfo')}</h2>
                             </div>
                             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-semibold text-slate-600">{Reflect.get(t, 'patientName')}</label>
-                                    <input type="text" value={patient.name} onChange={e => setPatient(Object.assign({}, patient, { name: e.target.value }))} className="w-full text-base font-bold p-3 border border-slate-300 rounded-lg outline-none focus:border-slate-500" />
+                                <div className="flex flex-col gap-2">
+                                    <label htmlFor="patientName" className="text-sm font-semibold text-slate-600">
+                                        {Reflect.get(t, 'patientName')}
+                                    </label>
+                                    <input
+                                        id="patientName"
+                                        name="patientName"
+                                        type="text"
+                                        value={patient.name}
+                                        onChange={e => setPatient(Object.assign({}, patient, { name: e.target.value }))}
+                                        className="w-full text-base font-bold p-3 border border-slate-300 rounded-lg outline-none focus:border-slate-500"
+                                    />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-semibold text-slate-600">{Reflect.get(t, 'chartNo')}</label>
-                                    <input type="text" value={patient.chartNo} onChange={e => setPatient(Object.assign({}, patient, { chartNo: e.target.value }))} className="w-full text-base font-bold p-3 border border-slate-300 rounded-lg outline-none focus:border-slate-500" />
+
+                                <div className="flex flex-col gap-2">
+                                    <label htmlFor="chartNo" className="text-sm font-semibold text-slate-600">
+                                        {Reflect.get(t, 'chartNo')}
+                                    </label>
+                                    <input
+                                        id="chartNo"
+                                        name="chartNo"
+                                        type="text"
+                                        value={patient.chartNo}
+                                        onChange={e => setPatient(Object.assign({}, patient, { chartNo: e.target.value }))}
+                                        className="w-full text-base font-bold p-3 border border-slate-300 rounded-lg outline-none focus:border-slate-500"
+                                    />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-semibold text-slate-600">{Reflect.get(t, 'date')}</label>
-                                    <input type="date" value={patient.date} onChange={e => setPatient(Object.assign({}, patient, { date: e.target.value }))} className="w-full text-base font-bold p-3 border border-slate-300 rounded-lg outline-none focus:border-slate-500" />
+
+                                <div className="flex flex-col gap-2">
+                                    <label htmlFor="date" className="text-sm font-semibold text-slate-600">
+                                        {Reflect.get(t, 'date')}
+                                    </label>
+                                    <input
+                                        id="date"
+                                        name="date"
+                                        type="date"
+                                        value={patient.date}
+                                        onChange={e => setPatient(Object.assign({}, patient, { date: e.target.value }))}
+                                        className="w-full text-base font-bold p-3 border border-slate-300 rounded-lg outline-none focus:border-slate-500"
+                                    />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-semibold text-slate-600">{Reflect.get(t, 'assessmentType')}</label>
-                                    <select value={patient.assessmentType} onChange={e => setPatient(Object.assign({}, patient, { assessmentType: e.target.value }))} className="w-full text-base font-bold p-3 border border-slate-300 rounded-lg outline-none focus:border-slate-500 bg-white">
+
+                                <div className="flex flex-col gap-2 select-container">
+                                    <label htmlFor="assessmentType" className="text-sm font-semibold text-slate-600">
+                                        {Reflect.get(t, 'assessmentType')}
+                                    </label>
+                                    <select
+                                        id="assessmentType"
+                                        name="assessmentType"
+                                        value={patient.assessmentType}
+                                        onChange={e => setPatient(Object.assign({}, patient, { assessmentType: e.target.value }))}
+                                        className="w-full text-base font-bold p-3 border border-slate-300 rounded-lg outline-none focus:border-slate-500 bg-white"
+                                    >
                                         <option value="baseline">{Reflect.get(t, 'baseline')}</option>
                                         <option value="recall">{Reflect.get(t, 'recall')}</option>
                                     </select>
@@ -372,165 +436,342 @@ export default function CambraApp() {
                         </div>
                     </div>
 
-                    {/* TAB: RESULTS */}
-                    <div className={`${activeTab !== 'results' ? 'hidden print:block' : ''} space-y-6 relative`}>
+                    {/* TAB: RESULTS (REIMAGINED: FLUID & INTERACTIVE) */}
+                    <div
+                        className={`transition-all duration-700 ease-out transform ${activeTab === 'results' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'
+                            } ${activeTab !== 'results' ? 'hidden' : 'block'} space-y-6 pb-20`}
+                    >
+                        {/* 1. THE STATUS "STAMP" (Neo-Brutalist Clearance Tag) */}
+                        <div className="relative group perspective-1000 w-full mb-10">
+                            <div className="relative w-full rounded-[2rem] border-4 border-slate-900 shadow-[12px_12px_0px_#0f172a] hover:shadow-[2px_2px_0px_#0f172a] hover:translate-x-2.5 hover:translate-y-2.5 transition-all duration-300 ease-out flex flex-col md:flex-row overflow-hidden bg-white">
 
-                        {/* OVERLAY MODAL */}
-                        {activeModal && modalData && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm" onClick={() => setActiveModal(null)}>
-                                <div
-                                    className="bg-white w-full max-w-lg border-4 border-slate-900 shadow-[8px_8px_0px_rgba(0,0,0,1)] flex flex-col max-h-[80vh]"
-                                    onClick={e => e.stopPropagation()}
-                                >
-                                    <div className={`p-4 border-b-4 border-slate-900 flex justify-between items-center ${Reflect.get(modalData, 'colorClass')}`}>
-                                        <span className="font-black font-mono tracking-widest uppercase">{Reflect.get(modalData, 'title')}</span>
-                                        <button onClick={() => setActiveModal(null)} className="font-black hover:scale-110 transition-transform hover:bg-red-500 rounded pt-0.5 px-1.5 hover:text-white cursor-pointer active:scale-50">✕</button>
+                                {/* LEFT SIDE: The Massive Verdict Zone */}
+                                <div className={`relative flex-1 p-8 md:p-12 flex flex-col justify-center overflow-hidden transition-all duration-500 ${CatColors[results.finalCat].split(' ')[0]}`}>
+
+                                    {/* Dotted Blueprint Texture */}
+                                    <div className="absolute inset-0 opacity-10 pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'radial-gradient(#000 1.5px, transparent 1.5px)', backgroundSize: '16px 16px' }}></div>
+
+                                    {/* Oversized Ambient Watermark */}
+                                    <Shield className="absolute -right-12 -bottom-12 w-80 h-80 opacity-[0.07] text-black rotate-12 transition-transform duration-700 group-hover:rotate-0 group-hover:scale-110 pointer-events-none" strokeWidth={1} />
+
+                                    {/* Hazard Tape (Only shows for High/Extreme Risk) */}
+                                    {(results.finalCat === 'extremeRisk' || results.finalCat === 'highRisk') && (
+                                        <div className="absolute top-0 left-0 w-full h-3 opacity-30" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 10px, transparent 10px, transparent 20px)' }}></div>
+                                    )}
+
+                                    <div className="relative z-10 flex flex-col items-start">
+                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-black/10 text-black border-2 border-black/20 rounded-full text-[10px] font-black uppercase tracking-[0.2em] backdrop-blur-md mb-6 shadow-[2px_2px_0px_rgba(0,0,0,0.15)]">
+                                            <Activity className="w-3 h-3" />
+                                            {lang === 'fa' ? 'نتیجه آنالیز الگوریتم' : 'ALGORITHM VERDICT'}
+                                        </div>
+
+                                        {/* Massive Typography that breaks the standard grid */}
+                                        <h2 className="text-6xl font-black uppercase tracking-tighter leading-[0.85] text-white drop-shadow-[4px_4px_0px_rgba(0,0,0,0.3)]">
+                                            {Reflect.get(t, results.finalCat)}
+                                        </h2>
                                     </div>
-                                    <div className="p-6 overflow-y-auto bg-slate-50 font-mono text-sm space-y-3">
-                                        {Reflect.get(modalData, 'items').length > 0 ? (
-                                            Reflect.get(modalData, 'items').map((item, i) => (
-                                                <div key={i} className="flex gap-3 items-start border-l-2 border-slate-300 pl-3 py-1">
-                                                    <span className="text-slate-400 font-black pt-0.5">{(i + 1).toString().padStart(2, '0')}</span>
-                                                    <span className="text-slate-800 font-bold leading-relaxed">{item}</span>
-                                                </div>
-                                            ))
+                                </div>
+
+                                {/* RIGHT SIDE: The Black Telemetry Module */}
+                                <div className="w-full md:w-[320px] bg-slate-900 text-white p-8 md:p-10 flex flex-col justify-between border-t-4 md:border-t-0 md:border-l-4 border-slate-900 relative">
+
+                                    {/* Inner Border Detail */}
+                                    <div className="absolute inset-2 border border-slate-700/50 rounded-[1.2rem] pointer-events-none"></div>
+
+                                    {/* Score Readout */}
+                                    <div className="relative z-10 flex flex-col gap-1 mb-8">
+                                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div>
+                                            {lang === 'fa' ? 'شاخص نمره خالص' : 'NET SCORE INDEX'}
+                                        </span>
+                                        <div className="flex items-end gap-3 mt-2" dir="ltr">
+                                            <span className="text-7xl font-black font-mono leading-none tracking-tighter text-white drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]">
+                                                {results.score > 0 ? `+${results.score}` : results.score}
+                                            </span>
+                                            <span className="text-sm font-bold text-slate-500 mb-1.5 uppercase">pts</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Critical Modifiers / Slapped-on Sticker UI */}
+                                    <div className="relative z-10 flex-1 flex flex-col justify-end">
+                                        {results.hasHyposalivation ? (
+                                            <div className="bg-red-500 text-white border-2 border-red-300 p-3.5 rounded-xl shadow-[4px_4px_0px_#7f1d1d] transform -rotate-2 group-hover:rotate-0 transition-transform duration-300">
+                                                <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest mb-1 opacity-80">
+                                                    <Droplets className="w-3 h-3" /> {lang === 'fa' ? 'پرچم بحرانی' : 'CRITICAL FLAG'}
+                                                </span>
+                                                <span className="font-bold text-sm leading-tight block">
+                                                    {lang === 'fa' ? 'نقص شدید بزاق ثبت شده' : 'HYPOSALIVATION DETECTED'}
+                                                </span>
+                                            </div>
                                         ) : (
-                                            <div className="text-slate-400 font-black text-center py-8">No data logged</div>
+                                            <div className="bg-slate-800 text-slate-400 border-2 border-slate-700 p-3.5 rounded-xl border-dashed">
+                                                <span className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest mb-1 opacity-50">
+                                                    <Droplets className="w-3 h-3" /> {lang === 'fa' ? 'وضعیت' : 'STATUS'}
+                                                </span>
+                                                <span className="font-bold text-sm leading-tight block opacity-50">
+                                                    {lang === 'fa' ? 'جریان بزاق نرمال' : 'SALIVARY FLOW NORMAL'}
+                                                </span>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Absolute "Barcode" Badge hanging off the edge */}
+                                <div className="absolute top-8 md:top-12 -left-3 md:-left-4 bg-slate-900 text-white border-2 border-slate-900 shadow-[4px_4px_0px_#0f172a] px-3 py-1 font-mono text-[9px] font-black tracking-widest transform -rotate-90 origin-bottom-left z-20">
+                                    VER-2.0
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. THE CLINICAL ROADMAP (Neo-Brutalist Dossier UI) */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {[
+                                {
+                                    key: 'di',
+                                    score: results.dScore,
+                                    sign: '+',
+                                    themeMain: 'bg-red-500',
+                                    themeLight: 'bg-red-50',
+                                    themeBorder: 'border-red-200',
+                                    themeText: 'text-red-800',
+                                    label: lang === 'fa' ? 'پاتولوژی' : 'PATHOLOGY',
+                                    icon: Stethoscope,
+                                    count: results.dCount,
+                                    items: diseaseInd.map((checked, idx) => checked ? Reflect.get(t, `di_${idx + 1}`) : null).filter(Boolean)
+                                },
+                                {
+                                    key: 'rf',
+                                    score: results.rScore,
+                                    sign: '+',
+                                    themeMain: 'bg-amber-500',
+                                    themeLight: 'bg-amber-50',
+                                    themeBorder: 'border-amber-200',
+                                    themeText: 'text-amber-800',
+                                    label: lang === 'fa' ? 'بیولوژی' : 'BIOLOGY',
+                                    icon: Zap,
+                                    count: results.rCount,
+                                    items: riskFact.map((checked, idx) => checked ? Reflect.get(t, `rf_${idx + 1}`) : null).filter(Boolean)
+                                },
+                                {
+                                    key: 'pf',
+                                    score: results.pScore,
+                                    sign: '-',
+                                    themeMain: 'bg-emerald-500',
+                                    themeLight: 'bg-emerald-50',
+                                    themeBorder: 'border-emerald-200',
+                                    themeText: 'text-emerald-800',
+                                    label: lang === 'fa' ? 'محافظت' : 'PROTECTION',
+                                    icon: ShieldCheck,
+                                    count: results.pCount,
+                                    items: protFact.map((checked, idx) => checked ? Reflect.get(t, `pf_${idx + 1}`) : null).filter(Boolean)
+                                }
+                            ].map((stat, i) => (
+                                <div
+                                    key={stat.key}
+                                    style={{ transitionDelay: `${(i + 1) * 100}ms` }}
+                                    className="group relative flex flex-col bg-white rounded-[2rem] border-4 border-slate-900 shadow-[6px_6px_0px_#0f172a] hover:shadow-[0px_0px_0px_#0f172a] hover:translate-x-1.5 hover:translate-y-1.5 transition-all duration-300 overflow-hidden"
+                                >
+                                    {/* Ambient Corner Glow (Modern Touch) */}
+                                    <div className={`absolute -right-8 -top-8 w-32 h-32 rounded-full opacity-20 blur-2xl transition-transform duration-700 group-hover:scale-150 ${stat.themeMain} pointer-events-none`}></div>
+
+                                    {/* Top Module: Identity & Score */}
+                                    <div className="relative p-5  md:p-6 flex justify-between items-start">
+                                        <div className="flex flex-col gap-3">
+                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 border-slate-900 shadow-[2px_2px_0px_#0f172a] text-white ${stat.themeMain}`}>
+                                                <stat.icon className="w-6 h-6" />
+                                            </div>
+                                            <h3 className="font-black text-sm md:text-base text-slate-900 uppercase tracking-widest">{stat.label}</h3>
+                                        </div>
+
+
+
+
+                                        {/* Strict LTR Score Module */}
+                                        <div dir="ltr" className={`flex flex-col items-center justify-center px-3 py-2 rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_#0f172a] ${stat.themeLight}`}>
+                                            {/* <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Weight</span> */}
+                                            <span className={`font-mono font-black text-2xl md:text-3xl leading-none ${stat.themeText}`}>
+                                                {stat.sign}{stat.score}
+                                            </span>
+                                        </div>
+                                    </div>
+
+
+                                    {/* Bottom Module: Dense Tag Cloud */}
+                                    <div className="p-5 pt-0 md:p-3 md:pt-0 flex-1 relative">
+                                        {stat.items.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {stat.items.map((item, idx) => (
+                                                    <div
+                                                        key={idx}
+                                                        className={`inline-flex items-start gap-2 px-2.5 py-1.5 rounded-lg border-2 transition-colors duration-200 hover:brightness-95 ${stat.themeBorder} ${stat.themeLight}`}
+                                                    >
+                                                        <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 border border-black/10 ${stat.themeMain}`}></div>
+                                                        <span className={`text-[10px] md:text-[11px] font-bold leading-snug ${stat.themeText}`}>
+                                                            {item}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center gap-3 opacity-30 py-6">
+                                                <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-900 flex items-center justify-center">
+                                                    <span className="font-mono font-black text-xl">-</span>
+                                                </div>
+                                                <span className="text-[10px] font-black uppercase tracking-widest">
+                                                    {lang === 'fa' ? 'موردی یافت نشد' : 'NO DATA'}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+
+
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* 3. LOGIC OVERRIDES (Sketchy Post-its) */}
+                        {(results.dOverride || results.eOverride || results.orthoOverride) && (
+                            <div className="flex flex-wrap gap-4 py-4">
+                                {results.dOverride && (
+                                    <div className="rotate-[-1deg] bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-sm flex-1 min-w-[280px]">
+                                        <span className="flex items-center gap-2 text-red-600 font-black text-xs uppercase mb-1">
+                                            <ArrowUpRight className="w-4 h-4" /> {Reflect.get(t, 'diseaseOverride')}
+                                        </span>
+                                        <p className="text-sm font-bold text-red-800/80 leading-snug">
+                                            {lang === 'fa' ? 'شناسایی ضایعات فعال باعث انتقال به دسته پرخطر شد.' : 'Active lesions detected; status set to HIGH RISK regardless of score.'}
+                                        </p>
+                                    </div>
+                                )}
+                                {results.eOverride && (
+                                    <div className="rotate-[1deg] bg-slate-900 text-white p-4 rounded-xl shadow-lg flex-1 min-w-[280px]">
+                                        <span className="flex items-center gap-2 text-emerald-400 font-black text-xs uppercase mb-1">
+                                            <Zap className="w-4 h-4" /> {Reflect.get(t, 'extremeOverride')}
+                                        </span>
+                                        <p className="text-sm font-bold text-slate-300 leading-snug">
+                                            {lang === 'fa' ? 'ترکیب ریسک بالا و نقص بزاق یعنی ریسک حداکثری.' : 'High Risk + Dry Mouth protocol activated for EXTREME classification.'}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         )}
 
-                        {/* STATUS PANEL */}
-                        <div className={`p-8 border-4 border-slate-900 flex flex-col md:flex-row items-center justify-between text-center md:text-start shadow-[6px_6px_0px_rgba(15,23,42,1)] ${Reflect.get(CatColors, Reflect.get(results, 'finalCat'))}`}>
-                            <div>
-                                <div className="text-xs font-black uppercase tracking-[0.3em] opacity-80 mb-1">
-                                    {Reflect.get(t, 'riskCategory')}
-                                </div>
-                                <div className="text-5xl font-black uppercase drop-shadow-sm">
-                                    {Reflect.get(t, Reflect.get(results, 'finalCat'))}
-                                </div>
+                        {/* 4. THE ACTION PLAN (Prescription Cards) */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-4 px-2">
+                                <ClipboardCheck className="w-5 h-5 text-indigo-600" />
+                                <h3 className="font-black text-slate-900 uppercase tracking-widest text-sm">{lang === 'fa' ? 'برنامه درمانی اختصاصی' : 'CLINICAL ACTION PLAN'}</h3>
+                                <div className="flex-1 h-[1px] bg-slate-200"></div>
                             </div>
 
-                            {(Reflect.get(results, 'dOverride') || Reflect.get(results, 'eOverride') || Reflect.get(results, 'orthoOverride')) && (
-                                <div className="mt-6 md:mt-0 flex flex-col items-center md:items-end gap-2 border-t-2 md:border-t-0 md:border-l-2 border-black/20 pt-4 md:pt-0 md:pl-6">
-                                    {Reflect.get(results, 'dOverride') && <span className="text-xs bg-black/20 px-3 py-1.5 font-bold tracking-widest uppercase flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {Reflect.get(t, 'diseaseOverride')}</span>}
-                                    {Reflect.get(results, 'eOverride') && <span className="text-xs bg-black/20 px-3 py-1.5 font-bold tracking-widest uppercase flex items-center gap-2"><Activity className="w-4 h-4" /> {Reflect.get(t, 'extremeOverride')}</span>}
-                                    {Reflect.get(results, 'orthoOverride') && !Reflect.get(results, 'dOverride') && !Reflect.get(results, 'eOverride') && <span className="text-xs bg-black/20 px-3 py-1.5 font-bold tracking-widest uppercase flex items-center gap-2"><Activity className="w-4 h-4" /> {Reflect.get(t, 'orthoOverride')}</span>}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Card: Diagnostics */}
+                                <div className="bg-white rounded-3xl border-2 border-slate-900 overflow-hidden transition-all hover:shadow-2xl">
+                                    <div className="bg-slate-50 border-b-2 border-slate-900 p-4 flex items-center justify-between">
+                                        <span className="font-black text-xs text-slate-500 uppercase tracking-tighter flex items-center gap-2">
+                                            <Calendar className="w-4 h-4" /> {Reflect.get(t, 'recDiagnostics')}
+                                        </span>
+                                        <ArrowUpRight className="w-4 h-4 text-slate-300" />
+                                    </div>
+                                    <div className="p-6">
+                                        <div
+                                            dangerouslySetInnerHTML={{ __html: Reflect.get(t, Reflect.get(RecMap[results.finalCat], 'd')) }}
+                                            className="text-[15px] text-slate-700 leading-relaxed space-y-4"
+                                        />
+                                    </div>
                                 </div>
-                            )}
-                        </div>
 
-                        {/* INTERACTIVE TELEMETRY */}
-                        <div className="bg-white border-4 border-slate-900 shadow-[6px_6px_0px_rgba(15,23,42,1)] font-mono">
-                            <div className="bg-slate-900 text-white p-3 text-xs font-black uppercase tracking-widest flex items-center justify-between">
-                                <span>{Reflect.get(t, 'mathBreakdown')}</span>
-                            </div>
-
-                            <div className="flex flex-col text-sm">
-                                <button
-                                    onClick={() => setActiveModal('disease')}
-                                    className="cursor-pointer flex justify-between items-center p-4 border-b border-slate-300 hover:bg-slate-100 transition-colors group text-left"
-                                >
-                                    <div className="flex flex-col gap-1">
-                                        <span className="font-black text-slate-800">PATHOLOGY INDICATORS</span>
-                                        <span className="w-max ltr text-xs text-slate-500 font-bold group-hover:text-slate-800 transition-colors">{Reflect.get(results, 'dCount')} × [+{Reflect.get(settings, 'diseaseWeight')}] <br /> ⇲ INSPECT</span>
+                                {/* Card: Interventions */}
+                                <div className="bg-white rounded-3xl border-2 border-slate-900 overflow-hidden transition-all hover:shadow-2xl">
+                                    <div className="bg-slate-900 p-4 flex items-center justify-between">
+                                        <span className="font-black text-xs text-indigo-300 uppercase tracking-tighter flex items-center gap-2">
+                                            <Zap className="w-4 h-4" /> {Reflect.get(t, 'recInterventions')}
+                                        </span>
+                                        <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
                                     </div>
-                                    <span className="text-red-600 font-black text-xl bg-red-50 ltr monofont px-3 py-1 border border-red-200">+{Reflect.get(results, 'dScore')}</span>
-                                </button>
-
-                                <button
-                                    onClick={() => setActiveModal('risk')}
-                                    className="cursor-pointer flex justify-between items-center p-4 border-b border-slate-300 hover:bg-slate-100 transition-colors group text-left"
-                                >
-                                    <div className="flex flex-col gap-1">
-                                        <span className="font-black text-slate-800">BIOLOGICAL RISK</span>
-                                        <span className="w-max ltr text-xs text-slate-500 font-bold group-hover:text-slate-800 transition-colors">{Reflect.get(results, 'rCount')} × [+{Reflect.get(settings, 'riskWeight')}] <br /> ⇲ INSPECT</span>
+                                    <div className="p-6">
+                                        <div
+                                            dangerouslySetInnerHTML={{ __html: Reflect.get(t, Reflect.get(RecMap[results.finalCat], 'i')) }}
+                                            className="text-[15px] text-slate-700 leading-relaxed space-y-4"
+                                        />
                                     </div>
-                                    <span className="text-amber-600 font-black text-xl bg-amber-50 ltr monofont px-3 py-1 border border-amber-200">+{Reflect.get(results, 'rScore')}</span>
-                                </button>
-
-                                <button
-                                    onClick={() => setActiveModal('protective')}
-                                    className="cursor-pointer flex justify-between items-center p-4 border-b border-slate-300 hover:bg-slate-100 transition-colors group text-left"
-                                >
-                                    <div className="flex flex-col gap-1">
-                                        <span className="font-black text-slate-800">PREVENTIVE FACTORS</span>
-                                        <span className="w-max ltr text-xs text-slate-500 font-bold group-hover:text-slate-800 transition-colors">{Reflect.get(results, 'pCount')} × [-{Reflect.get(settings, 'protectiveWeight')}] <br /> ⇲ INSPECT</span>
-                                    </div>
-                                    <span className="text-emerald-600 font-black text-xl bg-emerald-50 ltr monofont px-3 py-1 border border-emerald-200">-{Reflect.get(results, 'pScore')}</span>
-                                </button>
-
-                                <div className="flex justify-between items-center p-5 bg-slate-200 border-t-4 border-slate-900">
-                                    <span className="font-black text-slate-900 uppercase text-lg tracking-widest">{Reflect.get(t, 'totalScore')}</span>
-                                    <span className="text-white bg-slate-900 font-black text-2xl px-4 py-1">{Reflect.get(results, 'score')}</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* CLINICAL DIRECTIVES (Mixed RTL/LTR Handled Here) */}
-                        <div className="grid grid-cols-1 gap-6 pt-4">
-
-                            <div className="bg-white border-2 border-slate-800 flex flex-col">
-                                <div className="bg-slate-100 border-b-2 border-slate-800 px-4 py-3 flex items-center justify-between">
-                                    <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">{Reflect.get(t, 'recDiagnostics')}</h2>
+                        {/* 5. INTERACTIVE FOOTER (The Big "Finish" Button) */}
+                        <div className="pt-12 flex flex-col items-center">
+                            <button
+                                onClick={submitToServer}
+                                disabled={isSubmitting}
+                                className="group relative cursor-pointer active:scale-95 transition-transform"
+                            >
+                                <div className="absolute inset-0 bg-indigo-800 rounded-2xl translate-x-1 translate-y-2"></div>
+                                <div className="relative bg-indigo-600 text-white border-4 border-slate-900 px-12 py-5 rounded-2xl font-black text-xl flex items-center gap-4 group-hover:translate-x-1 group-hover:translate-y-1 transition-transform">
+                                    {isSubmitting ? <Activity className="animate-spin" /> : <ClipboardCheck className="w-6 h-6" />}
+                                    {isSubmitting ? (lang === 'fa' ? 'در حال ثبت...' : 'SAVING...') : (lang === 'fa' ? 'ثبت و خروج' : 'FINISH & LOG')}
                                 </div>
-                                <div dir={isRtl ? 'rtl' : 'ltr'} className={`p-6 font-serif text-[15px] text-slate-800 leading-loose bg-white ${isRtl ? 'text-right' : 'text-left'}`}>
-                                    <div
-                                        dangerouslySetInnerHTML={{ __html: Reflect.get(t, Reflect.get(Reflect.get(RecMap, Reflect.get(results, 'finalCat')), 'd')) }}
-                                        className="[&>p]:mb-4 last:[&>p]:mb-0 [&>ul]:list-disc [&>ul]:ms-6 [&>ul>li]:mb-2"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="bg-white border-2 border-slate-800 flex flex-col">
-                                <div className="bg-slate-100 border-b-2 border-slate-800 px-4 py-3 flex items-center justify-between">
-                                    <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">{Reflect.get(t, 'recInterventions')}</h2>
-                                </div>
-                                <div dir={isRtl ? 'rtl' : 'ltr'} className={`p-6 font-serif text-[15px] text-slate-800 leading-loose bg-white ${isRtl ? 'text-right' : 'text-left'}`}>
-                                    <div
-                                        dangerouslySetInnerHTML={{ __html: Reflect.get(t, Reflect.get(Reflect.get(RecMap, Reflect.get(results, 'finalCat')), 'i')) }}
-                                        className="[&>p]:mb-4 last:[&>p]:mb-0 [&>ul]:list-disc [&>ul]:ms-6 [&>ul>li]:mb-2"
-                                    />
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <div className="pt-6 flex justify-center pb-8">
-                            <button onClick={submitToServer} disabled={isSubmitting} className="cursor-pointer bg-slate-900 active:bg-slate-500 hover:bg-slate-600 text-white border-4 border-transparent  px-8 py-4 font-black text-lg flex items-center gap-3 transition-all disabled:opacity-50">
-                                <Save className="w-6 h-6" /> {isSubmitting ? '...' : (isRtl ? 'ثبت نهایی در سرور' : 'SUBMIT_ASSESSMENT')}
                             </button>
                         </div>
-
-                    </div>
-                </div>
+                    </div>                </div>
             </main>
 
 
-            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex justify-between items-center z-40">
+            {/* FLOATING TACTICAL NAVIGATION */}
+            <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-2xl z-40 pointer-events-none">
+                <div className="bg-white/95 backdrop-blur-md border-2 border-slate-900 rounded-[1.8rem] p-1 flex items-center justify-between gap-3 pointer-events-auto">
 
-                <button
-                    disabled={activeTab === 'patient'}
-                    onClick={() => setActiveTab(tabOrder.at(tabOrder.indexOf(activeTab) - 1))}
-                    className="p-3 bg-slate-100 rounded-full disabled:opacity-30"
-                >
-                    <ChevronLeft className={`w-6 h-6 ${isRtl ? 'transform scale-x-[-1]' : ''}`} />
-                </button>
+                    {/* BACK BUTTON */}
+                    <button
+                        disabled={tabOrder.indexOf(activeTab) === 0}
+                        onClick={() => setActiveTab(tabOrder.at(tabOrder.indexOf(activeTab) - 1))}
+                        className={`group relative flex-shrink-0 w-14 h-14 bg-slate-100 rounded-3xl border-2 border-slate-900 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 active:bg-slate-300 transition-colors 
+                            ${tabOrder.indexOf(activeTab) === 0 ? 'invisible' : ''}
+                            `}
+                    >
+                        <ChevronLeft className={`w-7 h-7 text-slate-900 ${isRtl ? 'transform scale-x-[-1] group-active:translate-x-1' : 'group-active:-translate-x-1'}  transition-transform`} strokeWidth={3} />
+                    </button>
 
-                <span className="font-black text-slate-400 text-sm" dir='ltr'>
-                    {tabOrder.indexOf(activeTab) + 1} / {tabOrder.length}
-                </span>
+                    {/* PROGRESS DOTS (Neo-Brutalist Style) */}
+                    <div className="hidden sm:flex flex-1 justify-center gap-3" >
+                        {tabOrder.map((tab, idx) => {
+                            const isActive = idx === tabOrder.indexOf(activeTab);
+                            const isPast = idx < tabOrder.indexOf(activeTab);
+                            return (
+                                <div
+                                    key={tab}
+                                    className={`transition-all duration-500 rounded-full border-2 border-slate-900 ${isActive
+                                        ? 'w-8 h-3 bg-indigo-500 shadow-[2px_2px_0px_#0f172a]'
+                                        : isPast
+                                            ? 'w-3 h-3 bg-slate-900'
+                                            : 'w-3 h-3 bg-slate-200'
+                                        }`}
+                                />
+                            );
+                        })}
+                    </div>
 
-                <button
-                    disabled={activeTab === 'results' || !isTabValid(activeTab)}
-                    onClick={() => setActiveTab(tabOrder.at(tabOrder.indexOf(activeTab) + 1))}
-                    className="p-3 bg-indigo-600 text-white rounded-full disabled:opacity-30"
-                >
-                    <ChevronRight className={`w-6 h-6 ${isRtl ? 'transform scale-x-[-1]' : ''}`} />
-                </button>
+                    {/* MOBILE PROGRESS COUNTER */}
+                    <div className="flex sm:hidden flex-1 justify-center">
+                        <span className="font-black font-mono text-slate-900 bg-slate-100 border-2 border-slate-900 px-3 py-1 rounded-full shadow-[2px_2px_0px_#0f172a]" dir="ltr">
+                            {tabOrder.indexOf(activeTab) + 1} / {tabOrder.length}
+                        </span>
+                    </div>
 
+                    {/* NEXT BUTTON (Contextual Action) */}
+                    <button
+                        disabled={tabOrder.indexOf(activeTab) === tabOrder.length - 1 || !isTabValid(activeTab)}
+                        onClick={() => setActiveTab(tabOrder.at(tabOrder.indexOf(activeTab) + 1))}
+                        className={`group relative flex-shrink-0 w-14 h-14 bg-slate-100 rounded-3xl border-2 border-slate-900 flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-200 active:bg-slate-300 transition-colors
+                            ${tabOrder.indexOf(activeTab) === tabOrder.length - 1 ? 'invisible' : ''}
+                        `}
+
+                    >
+                        <ChevronRight className={`w-7 h-7 text-slate-900 ${isRtl ? 'transform scale-x-[-1] group-active:-translate-x-1' : 'group-active:translate-x-1'}  transition-transform`} strokeWidth={3} />
+                    </button>
+
+
+
+                </div>
             </nav>
 
 
@@ -553,7 +794,14 @@ export default function CambraApp() {
                         </h3>
                         <p className="text-slate-600 font-bold mb-6">{appAlert.message}</p>
                         <button
-                            onClick={() => setAppAlert({ ...appAlert, show: false })}
+                           onClick={() => {
+                                // Fire the reset function if it exists (only on success)
+                                if (appAlert.onClose) {
+                                    appAlert.onClose();
+                                }
+                                // Close the modal
+                                setAppAlert({ ...appAlert, show: false, onClose: null });
+                            }}
                             className="w-full py-3 bg-slate-900 text-white font-black uppercase tracking-widest hover:bg-slate-700 transition-colors"
                         >
                             {isRtl ? 'باشه' : 'OK'}
