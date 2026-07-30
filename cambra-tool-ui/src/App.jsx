@@ -456,8 +456,10 @@ function PdfModal({ open, onClose, lang, patient, results, config, diseaseInd, r
         { id: 'protect', label: fa ? 'عوامل محافظتی' : 'Protective Factors', on: true },
         { id: 'result', label: fa ? 'نتیجه' : 'Result', on: true },
         { id: 'tables', label: fa ? 'جداول مرجع' : 'Reference Tables', on: true },
+        { id: 'icdasImg', label: fa ? '└── شامل تصویر راهنمای ICDAS' : '└── Include ICDAS Reference Image', on: true, sub: true },
         { id: 'plan', label: fa ? 'برنامه درمانی' : 'Action Plan', on: true },
     ];
+
     const [secs, setSecs] = useState(SECS);
     useEffect(() => { if (open) setSecs(SECS) }, [open, lang]);
     const tog = id => setSecs(p => p.map(s => s.id === id ? { ...s, on: !s.on } : s));
@@ -573,50 +575,60 @@ function PdfModal({ open, onClose, lang, patient, results, config, diseaseInd, r
     </section>`;
 
         // ── Reference Tables ──
-        if (isOn('tables')) body += `
-    <section>
-        <div class="sec-head">
-            <div class="sec-icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg>
-            </div>
-            <h2>${fa ? 'جداول مرجع بالینی' : 'Clinical Reference Tables'}</h2>
-        </div>
-        <div class="tables-grid">
-            <div class="ref-table">
-                <div class="ref-table-head dark">
-                    <span class="ref-table-title">ICDAS</span>
-                    <span class="ref-table-sub">${fa ? 'طبقه‌بندی ضایعات اکلوزال' : 'Occlusal Lesion Classification'}</span>
+        // ── Reference Tables ──
+        if (isOn('tables')) {
+            body += `
+            <section>
+                <div class="sec-head">
+                    <div class="sec-icon">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg>
+                    </div>
+                    <h2>${fa ? 'جداول مرجع بالینی' : 'Clinical Reference Tables'}</h2>
                 </div>
-                <table>
-                    <thead><tr><th class="w-code">${fa ? 'کد' : 'Code'}</th><th>${fa ? 'معنی' : 'Meaning'}</th><th>${fa ? 'وضعیت' : 'Status'}</th></tr></thead>
-                    <tbody>
-                        <tr><td class="tc">0</td><td>${fa ? 'سطح دندان سالم' : 'Sound tooth surface'}</td><td class="ts">${fa ? 'بدون پوسیدگی' : 'No caries'}</td></tr>
-                        <tr><td class="tc">1</td><td>${fa ? 'اولین تغییر قابل مشاهده در مینا' : 'First visible enamel change (after drying)'}</td><td class="ts">${fa ? 'دمینرالیزاسیون اولیه' : 'Initial demineralisation'}</td></tr>
-                        <tr><td class="tc">2</td><td>${fa ? 'ضایعه سفید یا قهوه‌ای واضح' : 'Distinct white/brown lesion without drying'}</td><td class="ts">${fa ? 'پوسیدگی اولیه مینا' : 'Early enamel caries'}</td></tr>
-                        <tr><td class="tc">3</td><td>${fa ? 'شکستگی موضعی مینا (Microcavity)' : 'Localised enamel breakdown, no visible dentin'}</td><td class="ts">${fa ? 'محدود به مینا' : 'Mostly enamel-limited'}</td></tr>
-                        <tr><td class="tc">4</td><td>${fa ? 'سایه تیره از عاج زیر مینا' : 'Dark shadow from underlying dentin'}</td><td class="ts">${fa ? 'احتمال درگیری عاج' : 'Probable dentin involvement'}</td></tr>
-                        <tr><td class="tc">5</td><td>${fa ? 'حفره واضح همراه با نمایان شدن عاج' : 'Distinct cavity with exposed dentin'}</td><td class="ts">${fa ? 'پوسیدگی واضح' : 'Obvious caries'}</td></tr>
-                        <tr><td class="tc">6</td><td>${fa ? 'حفره وسیع با تخریب گسترده عاج' : 'Extensive cavity with wide dentin destruction'}</td><td class="ts">${fa ? 'پوسیدگی شدید' : 'Severe caries'}</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="ref-table">
-                <div class="ref-table-head indigo">
-                    <span class="ref-table-title">${fa ? 'پروگزیمال' : 'Proximal'}</span>
-                    <span class="ref-table-sub">${fa ? 'درجه‌بندی پوسیدگی پروگزیمال' : 'Proximal Caries Classification'}</span>
+                <div class="tables-grid">
+                    <div class="ref-table">
+                        <div class="ref-table-head dark">
+                            <span class="ref-table-title">ICDAS</span>
+                            <span class="ref-table-sub">${fa ? 'طبقه‌بندی ضایعات اکلوزال' : 'Occlusal Lesion Classification'}</span>
+                        </div>
+                        <table>
+                            <thead><tr><th class="w-code">${fa ? 'کد' : 'Code'}</th><th>${fa ? 'معنی' : 'Meaning'}</th><th>${fa ? 'وضعیت' : 'Status'}</th></tr></thead>
+                            <tbody>
+                                <tr><td class="tc">0</td><td>${fa ? 'سطح دندان سالم' : 'Sound tooth surface'}</td><td class="ts">${fa ? 'بدون پوسیدگی' : 'No caries'}</td></tr>
+                                <tr><td class="tc">1</td><td>${fa ? 'اولین تغییر قابل مشاهده در مینا' : 'First visible enamel change (after drying)'}</td><td class="ts">${fa ? 'دمینرالیزاسیون اولیه' : 'Initial demineralisation'}</td></tr>
+                                <tr><td class="tc">2</td><td>${fa ? 'ضایعه سفید یا قهوه‌ای واضح' : 'Distinct white/brown lesion without drying'}</td><td class="ts">${fa ? 'پوسیدگی اولیه مینا' : 'Early enamel caries'}</td></tr>
+                                <tr><td class="tc">3</td><td>${fa ? 'شکستگی موضعی مینا (Microcavity)' : 'Localised enamel breakdown, no visible dentin'}</td><td class="ts">${fa ? 'محدود به مینا' : 'Mostly enamel-limited'}</td></tr>
+                                <tr><td class="tc">4</td><td>${fa ? 'سایه تیره از عاج زیر مینا' : 'Dark shadow from underlying dentin'}</td><td class="ts">${fa ? 'احتمال درگیری عاج' : 'Probable dentin involvement'}</td></tr>
+                                <tr><td class="tc">5</td><td>${fa ? 'حفره واضح همراه با نمایان شدن عاج' : 'Distinct cavity with exposed dentin'}</td><td class="ts">${fa ? 'پوسیدگی واضح' : 'Obvious caries'}</td></tr>
+                                <tr><td class="tc">6</td><td>${fa ? 'حفره وسیع با تخریب گسترده عاج' : 'Extensive cavity with wide dentin destruction'}</td><td class="ts">${fa ? 'پوسیدگی شدید' : 'Severe caries'}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="ref-table">
+                        <div class="ref-table-head indigo">
+                            <span class="ref-table-title">${fa ? 'پروگزیمال' : 'Proximal'}</span>
+                            <span class="ref-table-sub">${fa ? 'درجه‌بندی پوسیدگی پروگزیمال' : 'Proximal Caries Classification'}</span>
+                        </div>
+                        <table>
+                            <thead><tr><th class="w-code">${fa ? 'کد' : 'Code'}</th><th>${fa ? 'محل ضایعه' : 'Lesion Location'}</th></tr></thead>
+                            <tbody>
+                                <tr><td class="tc accent">C1</td><td>${fa ? 'نیمه خارجی مینا' : 'Outer half of enamel'}</td></tr>
+                                <tr><td class="tc accent">C2</td><td>${fa ? 'نیمه داخلی مینا' : 'Inner half of enamel'}</td></tr>
+                                <tr><td class="tc accent">C3</td><td>${fa ? 'یک‌سوم خارجی عاج' : 'Outer third of dentin'}</td></tr>
+                                <tr><td class="tc accent">C4</td><td>${fa ? 'یک‌سوم میانی یا داخلی عاج' : 'Middle or inner third of dentin'}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <table>
-                    <thead><tr><th class="w-code">${fa ? 'کد' : 'Code'}</th><th>${fa ? 'محل ضایعه' : 'Lesion Location'}</th></tr></thead>
-                    <tbody>
-                        <tr><td class="tc accent">C1</td><td>${fa ? 'نیمه خارجی مینا' : 'Outer half of enamel'}</td></tr>
-                        <tr><td class="tc accent">C2</td><td>${fa ? 'نیمه داخلی مینا' : 'Inner half of enamel'}</td></tr>
-                        <tr><td class="tc accent">C3</td><td>${fa ? 'یک‌سوم خارجی عاج' : 'Outer third of dentin'}</td></tr>
-                        <tr><td class="tc accent">C4</td><td>${fa ? 'یک‌سوم میانی یا داخلی عاج' : 'Middle or inner third of dentin'}</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>`;
+                ${isOn('icdasImg') ? `
+                <div class="icdas-image-card">
+                    <div class="icdas-image-title">${fa ? 'راهنمای تصویری کلینیکی اکلوزال (ICDAS)' : 'Occlusal Clinical Visual Guide (ICDAS)'}</div>
+                    <div class="icdas-image-wrapper">
+                        <img src="/images/icdas.png" alt="ICDAS Reference" />
+                    </div>
+                </div>` : ''}
+            </section>`;
+        }
 
         // ── Action Plan ──
         if (isOn('plan')) body += `
@@ -903,6 +915,35 @@ section{
     grid-template-columns:1.8fr 1fr;
     gap:14px;
 }
+    .icdas-image-card {
+    margin-top: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fafafa;
+    break-inside: avoid;
+}
+.icdas-image-title {
+    font-size: 8px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #64748b;
+    background: #f8fafc;
+    padding: 6px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    letter-spacing: 1px;
+}
+.icdas-image-wrapper {
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.icdas-image-wrapper img {
+    max-width: 100%;
+    max-height: 160px;
+    object-fit: contain;
+}
 .ref-table{
     border:1px solid #e2e8f0;
     border-radius:8px;
@@ -1133,11 +1174,13 @@ td{
                 </div>
                 <div className="overflow-y-auto flex-1 p-3 space-y-1">
                     {secs.map(s => (
-                        <button key={s.id} onClick={() => tog(s.id)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${s.on ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'}`}>
-                            <div className={`w-5 h-5 rounded flex items-center justify-center transition-all ${s.on ? 'bg-slate-900' : 'bg-slate-200'}`}>
+                        <button key={s.id} onClick={() => tog(s.id)} 
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${s.on ? 'bg-slate-50' : 'bg-white hover:bg-slate-50'} ${s.sub ? (fa ? 'pr-8 bg-slate-50/30' : 'pl-8 bg-slate-50/30') : ''}`}
+                        >
+                            <div className={`w-5 h-5 rounded flex items-center justify-center transition-all ${s.on ? 'bg-slate-900' : 'bg-slate-200'} ${s.sub ? 'scale-90' : ''}`}>
                                 {s.on ? <Eye className="w-3 h-3 text-white" /> : <EyeOff className="w-3 h-3 text-slate-400" />}
                             </div>
-                            <span className={`text-sm font-medium ${s.on ? 'text-slate-900' : 'text-slate-400'}`}>{s.label}</span>
+                            <span className={`font-medium ${s.on ? 'text-slate-900' : 'text-slate-400'} ${s.sub ? 'text-xs text-slate-500' : 'text-sm'}`}>{s.label}</span>
                         </button>
                     ))}
                 </div>
