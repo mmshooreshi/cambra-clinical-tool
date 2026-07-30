@@ -538,7 +538,7 @@ function PdfModal({ open, onClose, lang, patient, results, config, diseaseInd, r
         const svgRisk = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`;
         const svgProtect = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`;
 
-        if (isOn('disease')) makeFactorSection(dInd, 'di', fa ? 'شاخص‌های بیماری' : 'Disease Indicators', '#ef4444', '#fef2f2', '#fecaca', '#dc2626', svgDisease);
+        if (isOn('disease')) makeFactorSection(diseaseInd, 'di', fa ? 'شاخص‌های بیماری' : 'Disease Indicators', '#ef4444', '#fef2f2', '#fecaca', '#dc2626', svgDisease);
         if (isOn('risk')) makeFactorSection(riskFact, 'rf', fa ? 'عوامل خطر' : 'Risk Factors', '#f59e0b', '#fffbeb', '#fde68a', '#d97706', svgRisk);
         if (isOn('protect')) makeFactorSection(protFact, 'pf', fa ? 'عوامل محافظتی' : 'Protective Factors', '#22c55e', '#f0fdf4', '#bbf7d0', '#059669', svgProtect);
 
