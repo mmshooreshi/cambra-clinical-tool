@@ -61,12 +61,14 @@ if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
 
 @media print{@page{margin:0;size:A4}}
 
-    html, body {
+html, body {
         height: 100%;
-        overflow-x: hidden;
-        scroll-behavior: smooth;
-        -webkit-overflow-scrolling: touch;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* Locks the window body from scrolling */
+        background-color: #ffffff;
     }
+
     /* Screen preview: simulate A4 pages */
 
     .lhsmall{
@@ -779,10 +781,10 @@ export default function CambraApp() {
 
 
     return (
-        <div dir={fa ? 'rtl' : 'ltr'} className={`min-h-screen bg-white text-slate-900 ${isW ? '' : 'pb-20'}`} style={{ fontFamily: "'Vazirmatn',system-ui,sans-serif" }}>
+        <div dir={fa ? 'rtl' : 'ltr'} className="h-[100dvh] w-full flex flex-col bg-white text-slate-900 overflow-hidden" style={{ fontFamily: "'Vazirmatn',system-ui,sans-serif" }}>
 
-            {/* HEADER */}
-            <header className="bg-white border-b border-slate-100 px-4 py-2 sticky top-0 z-30 flex items-center justify-between">
+            {/* HEADER - Locked */}
+            <header className="bg-white border-b border-slate-100 px-4 py-2 flex-shrink-0 z-30 flex items-center justify-between">
                 <div className="flex items-center gap-2 lhsmall">
                     <div className="w-7 h-7 bg-slate-900 rounded-lg flex items-center justify-center">
                         <span className="text-white font-bold text-xs" style={{ fontFamily: 'Georgia,serif' }}>C</span>
@@ -815,303 +817,304 @@ export default function CambraApp() {
                 </div>
             )}
 
-            {/* MAIN */}
-            <main className="max-w-2xl mx-auto p-4 md:p-6">
-                {isW && <Welcome lang={lang} onStart={() => setTab('patient')} />}
+            {/* MAIN - Scrollable Content Area Only */}
+            <main className="flex-1 overflow-y-auto px-4 md:px-6 py-6 pb-28">
+                <div className="max-w-2xl mx-auto">
+                    {isW && <Welcome lang={lang} onStart={() => setTab('patient')} />}
 
-                <div className={isW ? 'hidden' : 'space-y-5'}>
-
-                    {/* PATIENT */}
-                    <div className={tab !== 'patient' ? 'hidden' : ''}>
-                        <div className="c-fade-up bg-white rounded-2xl border border-slate-200 overflow-visible">
-                            <div className="px-4 py-2.5 border-b border-slate-100"><h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t.patientInfo}</h2></div>
-                            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.patientName}</label>
-                                    <input type="text" value={patient.name} onChange={e => setPatient(p => ({ ...p, name: e.target.value }))}
-                                        className="w-full text-sm font-medium px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-all bg-white"
-                                        placeholder={fa ? 'نام بیمار' : 'Patient name'} />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.chartNo}</label>
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={displayDigits(patient.chartNo, lang)}
-                                            onChange={e => {
-                                                // const raw = normalizeDigits(e.target.value);
-                                                const raw = e.target.value;
-                                                setPatient(p => ({ ...p, chartNo: raw }));
-                                            }}
-                                            className="w-full text-sm font-medium font-mono px-3 pe-10 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-all bg-white"
-                                            placeholder={fa ? 'شماره پرونده' : 'Chart #'} />
-                                        <button onClick={genChart} type="button" className="absolute top-1/2 -translate-y-1/2 end-1.5 w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center cursor-pointer active:scale-90 transition-all"><Shuffle className="w-3 h-3 text-white" /></button>
+                    <div className={isW ? 'hidden' : 'space-y-5'}>
+                        {/* PATIENT */}
+                        <div className={tab !== 'patient' ? 'hidden' : ''}>
+                            <div className="c-fade-up bg-white rounded-2xl border border-slate-200 overflow-visible">
+                                <div className="px-4 py-2.5 border-b border-slate-100"><h2 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t.patientInfo}</h2></div>
+                                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.patientName}</label>
+                                        <input type="text" value={patient.name} onChange={e => setPatient(p => ({ ...p, name: e.target.value }))}
+                                            className="w-full text-sm font-medium px-3 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-all bg-white"
+                                            placeholder={fa ? 'نام بیمار' : 'Patient name'} />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.chartNo}</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={displayDigits(patient.chartNo, lang)}
+                                                onChange={e => {
+                                                    // const raw = normalizeDigits(e.target.value);
+                                                    const raw = e.target.value;
+                                                    setPatient(p => ({ ...p, chartNo: raw }));
+                                                }}
+                                                className="w-full text-sm font-medium font-mono px-3 pe-10 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-all bg-white"
+                                                placeholder={fa ? 'شماره پرونده' : 'Chart #'} />
+                                            <button onClick={genChart} type="button" className="absolute top-1/2 -translate-y-1/2 end-1.5 w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center cursor-pointer active:scale-90 transition-all"><Shuffle className="w-3 h-3 text-white" /></button>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.date}</label>
+                                        <CalPicker value={patient.date} onChange={v => setPatient(p => ({ ...p, date: v }))} lang={lang} />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.assessmentType}</label>
+                                        <Sel value={patient.assessmentType} onChange={v => setPatient(p => ({ ...p, assessmentType: v }))} options={[{ value: 'baseline', label: t.baseline, desc: fa ? 'اولین ارزیابی' : 'First assessment' }, { value: 'recall', label: t.recall, desc: fa ? 'دوره‌ای' : 'Follow-up' }]} placeholder={fa ? 'انتخاب' : 'Select'} icon={ClipboardCheck} />
                                     </div>
                                 </div>
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.date}</label>
-                                    <CalPicker value={patient.date} onChange={v => setPatient(p => ({ ...p, date: v }))} lang={lang} />
+                            </div>
+
+                            <div className="c-fade-up c-d1 flex justify-center mb-2">
+                                <CImg name="ui_empty_single_24" alt="" className="w-50 h-50 active:scale-120 transition-all active:opacity-100 opacity-80" />
+                            </div>
+                        </div>
+
+                        {/* DISEASE + RISK */}
+                        <div className={`${tab !== 'disease' ? 'hidden' : ''} space-y-5`}>
+                            <div className="c-fade-up rounded-2xl border border-slate-200 overflow-visible bg-white">
+                                <div className="px-4 py-3 border-b border-red-100 bg-red-50/50 flex items-center gap-4 rounded-t-2xl relative">
+                                    <CImg name="ui_header_disease_single_23" alt="" className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0" />
+                                    <div>
+                                        <h2 className="text-[14px] font-bold text-red-700 uppercase tracking-wider">{t.diseaseIndicators}</h2>
+                                        <p className="text-[12px] text-red-400 mt-0.5">{t.diseaseIndSubtitle}</p>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.assessmentType}</label>
-                                    <Sel value={patient.assessmentType} onChange={v => setPatient(p => ({ ...p, assessmentType: v }))} options={[{ value: 'baseline', label: t.baseline, desc: fa ? 'اولین ارزیابی' : 'First assessment' }, { value: 'recall', label: t.recall, desc: fa ? 'دوره‌ای' : 'Follow-up' }]} placeholder={fa ? 'انتخاب' : 'Select'} icon={ClipboardCheck} />
+
+                                <div className="divide-y divide-slate-50">
+                                    {Array.from({ length: st.diseaseCount }).map((_, i) => (
+                                        <FactorRow key={`d${i}`} label={t[`di_${i + 1}`]} hint={t[`di_${i + 1}_hint`]} desc={t[`di_${i + 1}_desc`]}
+                                            checked={dInd[i]} onToggle={() => tog(setDInd, i)} color="red" weight={st.diseaseWeight} lang={lang}
+                                            descOpen={openDI === i} onDescToggle={() => setOpenDI(v => v === i ? null : i)} />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="c-fade-up c-d2 rounded-2xl border border-slate-200 overflow-visible bg-white">
+                                <div className="px-4 py-3 border-b border-amber-100 bg-amber-50/50 flex items-center gap-4 rounded-t-2xl relative">
+                                    <CImg name="ui_header_risk_single_21" alt="" className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0" />
+                                    <div>
+                                        <h2 className="text-[14px] font-bold text-amber-700 uppercase tracking-wider">{t.riskFactors}</h2>
+                                        <p className="text-[12px] text-amber-400 mt-0.5">{t.riskFactSubtitle}</p>
+                                    </div>
+                                </div>
+                                <div className="divide-y divide-slate-50">
+                                    {Array.from({ length: st.riskCount }).map((_, i) => (
+                                        <FactorRow key={`r${i}`} label={t[`rf_${i + 1}`]} hint={t[`rf_${i + 1}_hint`]} desc={t[`rf_${i + 1}_desc`]}
+                                            checked={rFact[i]} onToggle={() => tog(setRFact, i)} color="amber" weight={st.riskWeight} lang={lang} descOpen={openRF === i} onDescToggle={() => setOpenRF(v => v === i ? null : i)} />
+                                    ))}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="c-fade-up c-d1 flex justify-center mb-2">
-                            <CImg name="ui_empty_single_24" alt="" className="w-50 h-50 active:scale-120 transition-all active:opacity-100 opacity-80" />
-                        </div>
-                    </div>
-
-                    {/* DISEASE + RISK */}
-                    <div className={`${tab !== 'disease' ? 'hidden' : ''} space-y-5`}>
-                        <div className="c-fade-up rounded-2xl border border-slate-200 overflow-visible bg-white">
-                            <div className="px-4 py-3 border-b border-red-100 bg-red-50/50 flex items-center gap-4 rounded-t-2xl relative">
-                                <CImg name="ui_header_disease_single_23" alt="" className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0" />
-                                <div>
-                                    <h2 className="text-[14px] font-bold text-red-700 uppercase tracking-wider">{t.diseaseIndicators}</h2>
-                                    <p className="text-[12px] text-red-400 mt-0.5">{t.diseaseIndSubtitle}</p>
+                        {/* PROTECTIVE */}
+                        <div className={tab !== 'protective' ? 'hidden' : ''}>
+                            <div className="c-fade-up rounded-2xl border border-slate-200 overflow-visible bg-white">
+                                <div className="px-4 py-3 border-b border-emerald-100 bg-emerald-50/50 flex items-center gap-4 rounded-t-2xl relative">
+                                    <CImg name="ui_header_protective_single_22" alt="" className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0" />
+                                    <div>
+                                        <h2 className="text-[14px] font-bold text-emerald-700 uppercase tracking-wider">{t.protectiveFactors}</h2>
+                                        <p className="text-[12px] text-emerald-400 mt-0.5">{t.protFactSubtitle}</p>
+                                    </div>
+                                </div>
+                                <div className="divide-y divide-slate-50">
+                                    {Array.from({ length: st.protectiveCount }).map((_, i) => (
+                                        <FactorRow key={`p${i}`} label={t[`pf_${i + 1}`]} hint={t[`pf_${i + 1}_hint`]} desc={t[`pf_${i + 1}_desc`]}
+                                            checked={pFact[i]} onToggle={() => tog(setPFact, i)} color="emerald" weight={st.protectiveWeight} lang={lang} descOpen={openPF === i} onDescToggle={() => setOpenPF(v => v === i ? null : i)} />
+                                    ))}
                                 </div>
                             </div>
-
-                            <div className="divide-y divide-slate-50">
-                                {Array.from({ length: st.diseaseCount }).map((_, i) => (
-                                    <FactorRow key={`d${i}`} label={t[`di_${i + 1}`]} hint={t[`di_${i + 1}_hint`]} desc={t[`di_${i + 1}_desc`]}
-                                        checked={dInd[i]} onToggle={() => tog(setDInd, i)} color="red" weight={st.diseaseWeight} lang={lang}
-                                        descOpen={openDI === i} onDescToggle={() => setOpenDI(v => v === i ? null : i)} />
-                                ))}
-                            </div>
                         </div>
-                        <div className="c-fade-up c-d2 rounded-2xl border border-slate-200 overflow-visible bg-white">
-                            <div className="px-4 py-3 border-b border-amber-100 bg-amber-50/50 flex items-center gap-4 rounded-t-2xl relative">
-                                <CImg name="ui_header_risk_single_21" alt="" className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0" />
-                                <div>
-                                    <h2 className="text-[14px] font-bold text-amber-700 uppercase tracking-wider">{t.riskFactors}</h2>
-                                    <p className="text-[12px] text-amber-400 mt-0.5">{t.riskFactSubtitle}</p>
-                                </div>
-                            </div>
-                            <div className="divide-y divide-slate-50">
-                                {Array.from({ length: st.riskCount }).map((_, i) => (
-                                    <FactorRow key={`r${i}`} label={t[`rf_${i + 1}`]} hint={t[`rf_${i + 1}_hint`]} desc={t[`rf_${i + 1}_desc`]}
-                                        checked={rFact[i]} onToggle={() => tog(setRFact, i)} color="amber" weight={st.riskWeight} lang={lang} descOpen={openRF === i} onDescToggle={() => setOpenRF(v => v === i ? null : i)} />
-                                ))}
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* PROTECTIVE */}
-                    <div className={tab !== 'protective' ? 'hidden' : ''}>
-                        <div className="c-fade-up rounded-2xl border border-slate-200 overflow-visible bg-white">
-                            <div className="px-4 py-3 border-b border-emerald-100 bg-emerald-50/50 flex items-center gap-4 rounded-t-2xl relative">
-                                <CImg name="ui_header_protective_single_22" alt="" className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0" />
-                                <div>
-                                    <h2 className="text-[14px] font-bold text-emerald-700 uppercase tracking-wider">{t.protectiveFactors}</h2>
-                                    <p className="text-[12px] text-emerald-400 mt-0.5">{t.protFactSubtitle}</p>
-                                </div>
-                            </div>
-                            <div className="divide-y divide-slate-50">
-                                {Array.from({ length: st.protectiveCount }).map((_, i) => (
-                                    <FactorRow key={`p${i}`} label={t[`pf_${i + 1}`]} hint={t[`pf_${i + 1}_hint`]} desc={t[`pf_${i + 1}_desc`]}
-                                        checked={pFact[i]} onToggle={() => tog(setPFact, i)} color="emerald" weight={st.protectiveWeight} lang={lang} descOpen={openPF === i} onDescToggle={() => setOpenPF(v => v === i ? null : i)} />
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+                        {/* RESULTS */}
+                        <div className={`${tab !== 'results' ? 'hidden' : ''} space-y-5 pb-12`}>
+                            {/* ── Verdict banner ── */}
+                            <div className="c-fade-up">
+                                <div className={`flex flex-col sm:flex-row items-center sm:items-stretch border-2 border-slate-900 rounded-2xl overflow-hidden shadow-[4px_4px_0_#0f172a] ${catBg[results.finalCat]}`}>
 
-                    {/* RESULTS */}
-                    <div className={`${tab !== 'results' ? 'hidden' : ''} space-y-5 pb-12`}>
-                        {/* ── Verdict banner ── */}
-                        <div className="c-fade-up">
-                            <div className={`flex flex-col sm:flex-row items-center sm:items-stretch border-2 border-slate-900 rounded-2xl overflow-hidden shadow-[4px_4px_0_#0f172a] ${catBg[results.finalCat]}`}>
+                                    {/* Mascot Image */}
+                                    <div className="w-full sm:w-1/3 p-6 flex items-center justify-center bg-black/10">
+                                        <CImg name={OUTCOME_IMAGES[results.finalCat]} alt="" className="w-40 sm:w-full max-w-[180px] drop-shadow-md c-pop" />
+                                    </div>
 
-                                {/* Mascot Image */}
-                                <div className="w-full sm:w-1/3 p-6 flex items-center justify-center bg-black/10">
-                                    <CImg name={OUTCOME_IMAGES[results.finalCat]} alt="" className="w-40 sm:w-full max-w-[180px] drop-shadow-md c-pop" />
-                                </div>
+                                    {/* Content Side */}
+                                    <div className="w-full sm:w-2/3 p-5 flex flex-col justify-center">
+                                        <div className="flex items-start justify-between gap-4 mb-4">
+                                            <div>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-1 block">
+                                                    {fa ? 'نتیجه ارزیابی ریسک' : 'Risk Assessment Result'}
+                                                </span>
+                                                <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-none">
+                                                    {t[results.finalCat]}
+                                                </h2>
 
-                                {/* Content Side */}
-                                <div className="w-full sm:w-2/3 p-5 flex flex-col justify-center">
-                                    <div className="flex items-start justify-between gap-4 mb-4">
-                                        <div>
-                                            <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-1 block">
-                                                {fa ? 'نتیجه ارزیابی ریسک' : 'Risk Assessment Result'}
-                                            </span>
-                                            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-none">
-                                                {t[results.finalCat]}
-                                            </h2>
+                                                {/* Overrides */}
+                                                {(results.dOverride || results.eOverride || results.orthoOverride) && (
+                                                    <div className="flex flex-wrap gap-1.5 mt-3">
+                                                        {results.dOverride && <span className="bg-white/20 text-white text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {t.diseaseOverride}</span>}
+                                                        {results.eOverride && <span className="bg-white/20 text-white text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><Droplets className="w-3 h-3" /> {t.extremeOverride}</span>}
+                                                        {results.orthoOverride && <span className="bg-white/20 text-white text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {t.orthoOverride}</span>}
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                            {/* Overrides */}
-                                            {(results.dOverride || results.eOverride || results.orthoOverride) && (
-                                                <div className="flex flex-wrap gap-1.5 mt-3">
-                                                    {results.dOverride && <span className="bg-white/20 text-white text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {t.diseaseOverride}</span>}
-                                                    {results.eOverride && <span className="bg-white/20 text-white text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><Droplets className="w-3 h-3" /> {t.extremeOverride}</span>}
-                                                    {results.orthoOverride && <span className="bg-white/20 text-white text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {t.orthoOverride}</span>}
+                                            {/* Total Score Chip */}
+                                            <div className="flex-shrink-0 text-center bg-white rounded-xl p-3 border-2 border-slate-900 shadow-[2px_2px_0_#0f172a] min-w-[70px]">
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">{t.totalScore}</span>
+                                                <div className="text-2xl font-black font-mono text-slate-900" dir="ltr">
+                                                    {results.score > 0 ? '+' : ''}{toFa(results.score, lang)}
                                                 </div>
-                                            )}
-                                        </div>
-
-                                        {/* Total Score Chip */}
-                                        <div className="flex-shrink-0 text-center bg-white rounded-xl p-3 border-2 border-slate-900 shadow-[2px_2px_0_#0f172a] min-w-[70px]">
-                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">{t.totalScore}</span>
-                                            <div className="text-2xl font-black font-mono text-slate-900" dir="ltr">
-                                                {results.score > 0 ? '+' : ''}{toFa(results.score, lang)}
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* Score Breakdown Bar */}
-                                    <div className="flex items-center gap-2 mt-auto pt-3 border-t border-white/20" dir="ltr">
-                                        <span className="flex items-center justify-center px-2 py-1 rounded bg-red-500 text-white text-[11px] font-bold font-mono border border-slate-900">+{toFa(results.dScore, lang)}</span>
-                                        <span className="flex items-center justify-center px-2 py-1 rounded bg-amber-400 text-slate-900 text-[11px] font-bold font-mono border border-slate-900">+{toFa(results.rScore, lang)}</span>
-                                        <span className="flex items-center justify-center px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-bold font-mono border border-slate-900">−{toFa(results.pScore, lang)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Salivation Status */}
-                            {results.hasHyposalivation && (
-                                <div className="mt-4 bg-slate-900 text-white border-2 border-slate-900 rounded-xl px-5 py-3 flex items-center gap-3 shadow-[4px_4px_0_#cbd5e1]">
-                                    <Droplets className="w-5 h-5 text-amber-400 flex-shrink-0" />
-                                    <span className="text-sm font-semibold">{fa ? 'هیپوسالیواسیون — جریان بزاق کاهش‌یافته' : 'Hyposalivation — reduced salivary flow'}</span>
-                                </div>
-                            )}
-                        </div>
-
-
-                        {/* ── Score breakdown bars ── */}
-                        <div className="c-fade-up c-d1 flex justify-center mb-2">
-                            <CImg name="ui_balance_single_25" alt="" className="w-50 h-50 -my-8 opacity-60" />
-                        </div>
-                        <div className="c-fade-up c-d1 grid grid-cols-3 gap-2">
-                            {[
-                                { label: fa ? 'بیماری' : 'Disease', val: results.dScore, max: st.diseaseCount * st.diseaseWeight, bar: 'bg-red-500', bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-700', ic: Stethoscope, items: dInd.map((c, i) => c ? t[`di_${i + 1}`] : null).filter(Boolean) },
-                                { label: fa ? 'خطر' : 'Risk', val: results.rScore, max: st.riskCount * st.riskWeight, bar: 'bg-amber-400', bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700', ic: Zap, items: rFact.map((c, i) => c ? t[`rf_${i + 1}`] : null).filter(Boolean) },
-                                { label: fa ? 'محافظت' : 'Protect', val: results.pScore, max: st.protectiveCount * st.protectiveWeight, bar: 'bg-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700', ic: ShieldCheck, items: pFact.map((c, i) => c ? t[`pf_${i + 1}`] : null).filter(Boolean) },
-                            ].map(s => (
-                                <div key={s.label} className={`rounded-2xl border ${s.border} ${s.bg} p-3`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <s.ic className={`w-3.5 h-3.5 ${s.text}`} />
-                                        <span className={`font-mono font-bold text-sm ${s.text}`} dir="ltr">{s.val > 0 ? '+' : ''}{toFa(s.val, lang)}</span>
-                                    </div>
-                                    <div className="h-1 bg-white rounded-full overflow-hidden mb-2">
-                                        <div className={`h-full rounded-full transition-all duration-700 ${s.bar}`} style={{ width: `${Math.min(100, s.val / (s.max || 1) * 100)}%` }} />
-                                    </div>
-                                    <div className={`text-[9px] font-bold uppercase tracking-wider ${s.text} opacity-70`}>{s.label}</div>
-                                    {s.items.length > 0 && (
-                                        <div className="mt-2 space-y-1">
-                                            {s.items.map((it, i) => (
-                                                <div key={i} className={`text-[10px] font-medium ${s.text} opacity-80 flex items-start gap-1`}>
-                                                    <div className={`w-1 h-1 rounded-full mt-1.5 flex-shrink-0 ${s.bar}`} />{it}
-                                                </div>
-                                            ))}
+                                        {/* Score Breakdown Bar */}
+                                        <div className="flex items-center gap-2 mt-auto pt-3 border-t border-white/20" dir="ltr">
+                                            <span className="flex items-center justify-center px-2 py-1 rounded bg-red-500 text-white text-[11px] font-bold font-mono border border-slate-900">+{toFa(results.dScore, lang)}</span>
+                                            <span className="flex items-center justify-center px-2 py-1 rounded bg-amber-400 text-slate-900 text-[11px] font-bold font-mono border border-slate-900">+{toFa(results.rScore, lang)}</span>
+                                            <span className="flex items-center justify-center px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-bold font-mono border border-slate-900">−{toFa(results.pScore, lang)}</span>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
 
-                        {/* ── Reference tables ── */}
-                        <div className="c-fade-up c-d2 space-y-3">
-                            <div className="flex items-center gap-2 px-1">
-                                <Layers className="w-3.5 h-3.5 text-slate-400" />
-                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{fa ? 'جداول مرجع بالینی' : 'Clinical Reference'}</h3>
-                                <div className="flex-1 h-px bg-slate-100" />
+                                {/* Salivation Status */}
+                                {results.hasHyposalivation && (
+                                    <div className="mt-4 bg-slate-900 text-white border-2 border-slate-900 rounded-xl px-5 py-3 flex items-center gap-3 shadow-[4px_4px_0_#cbd5e1]">
+                                        <Droplets className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                                        <span className="text-sm font-semibold">{fa ? 'هیپوسالیواسیون — جریان بزاق کاهش‌یافته' : 'Hyposalivation — reduced salivary flow'}</span>
+                                    </div>
+                                )}
                             </div>
 
-                            {/* ICDAS */}
-                            {/* ICDAS and Pinch Zoom Image Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Table Card */}
-                                <div className="rounded-2xl border border-slate-200 overflow-hidden h-fit">
-                                    <div className="bg-slate-900 px-4 py-2 flex items-center justify-between">
-                                        <span className="text-white text-xs font-bold tracking-wider">ICDAS</span>
-                                        <span className="text-slate-500 text-[8px] font-medium tracking-wider uppercase">{fa ? 'طبقه‌بندی ضایعات اکلوزال' : 'Occlusal Lesion Classification'}</span>
+
+                            {/* ── Score breakdown bars ── */}
+                            <div className="c-fade-up c-d1 flex justify-center mb-2">
+                                <CImg name="ui_balance_single_25" alt="" className="w-50 h-50 -my-8 opacity-60" />
+                            </div>
+                            <div className="c-fade-up c-d1 grid grid-cols-3 gap-2">
+                                {[
+                                    { label: fa ? 'بیماری' : 'Disease', val: results.dScore, max: st.diseaseCount * st.diseaseWeight, bar: 'bg-red-500', bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-700', ic: Stethoscope, items: dInd.map((c, i) => c ? t[`di_${i + 1}`] : null).filter(Boolean) },
+                                    { label: fa ? 'خطر' : 'Risk', val: results.rScore, max: st.riskCount * st.riskWeight, bar: 'bg-amber-400', bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700', ic: Zap, items: rFact.map((c, i) => c ? t[`rf_${i + 1}`] : null).filter(Boolean) },
+                                    { label: fa ? 'محافظت' : 'Protect', val: results.pScore, max: st.protectiveCount * st.protectiveWeight, bar: 'bg-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700', ic: ShieldCheck, items: pFact.map((c, i) => c ? t[`pf_${i + 1}`] : null).filter(Boolean) },
+                                ].map(s => (
+                                    <div key={s.label} className={`rounded-2xl border ${s.border} ${s.bg} p-3`}>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <s.ic className={`w-3.5 h-3.5 ${s.text}`} />
+                                            <span className={`font-mono font-bold text-sm ${s.text}`} dir="ltr">{s.val > 0 ? '+' : ''}{toFa(s.val, lang)}</span>
+                                        </div>
+                                        <div className="h-1 bg-white rounded-full overflow-hidden mb-2">
+                                            <div className={`h-full rounded-full transition-all duration-700 ${s.bar}`} style={{ width: `${Math.min(100, s.val / (s.max || 1) * 100)}%` }} />
+                                        </div>
+                                        <div className={`text-[9px] font-bold uppercase tracking-wider ${s.text} opacity-70`}>{s.label}</div>
+                                        {s.items.length > 0 && (
+                                            <div className="mt-2 space-y-1">
+                                                {s.items.map((it, i) => (
+                                                    <div key={i} className={`text-[10px] font-medium ${s.text} opacity-80 flex items-start gap-1`}>
+                                                        <div className={`w-1 h-1 rounded-full mt-1.5 flex-shrink-0 ${s.bar}`} />{it}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
+                                ))}
+                            </div>
+
+                            {/* ── Reference tables ── */}
+                            <div className="c-fade-up c-d2 space-y-3">
+                                <div className="flex items-center gap-2 px-1">
+                                    <Layers className="w-3.5 h-3.5 text-slate-400" />
+                                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{fa ? 'جداول مرجع بالینی' : 'Clinical Reference'}</h3>
+                                    <div className="flex-1 h-px bg-slate-100" />
+                                </div>
+
+                                {/* ICDAS */}
+                                {/* ICDAS and Pinch Zoom Image Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Table Card */}
+                                    <div className="rounded-2xl border border-slate-200 overflow-hidden h-fit">
+                                        <div className="bg-slate-900 px-4 py-2 flex items-center justify-between">
+                                            <span className="text-white text-xs font-bold tracking-wider">ICDAS</span>
+                                            <span className="text-slate-500 text-[8px] font-medium tracking-wider uppercase">{fa ? 'طبقه‌بندی ضایعات اکلوزال' : 'Occlusal Lesion Classification'}</span>
+                                        </div>
+                                        <table className="w-full text-xs border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50">
+                                                    <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 w-12">{fa ? 'کد' : 'Code'}</th>
+                                                    <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">{fa ? 'معنی' : 'Meaning'}</th>
+                                                    <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">{fa ? 'وضعیت' : 'Status'}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {icdasData.map(([code, meaning, status], i) => (
+                                                    <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                                                        <td className="py-1.5 px-3 font-mono font-bold text-center text-slate-900">{code}</td>
+                                                        <td className="py-1.5 px-3 text-slate-700 font-medium text-[11px]">{meaning}</td>
+                                                        <td className="py-1.5 px-3 text-slate-500 text-[10px]">{status}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Bouncy Pinch Zoom Area */}
+                                    <BouncyPinchZoom src="/images/icdas.png" alt="ICDAS Reference" />
+                                </div>
+                                {/* Proximal */}
+                                <div className="rounded-2xl border border-slate-200 overflow-hidden">                                <div className="bg-indigo-600 px-4 py-2 flex items-center justify-between">
+                                    <span className="text-white text-xs font-bold tracking-wider">{fa ? 'پروگزیمال' : 'Proximal C'}</span>
+                                    <span className="text-indigo-200 text-[8px] font-medium tracking-wider uppercase">{fa ? 'درجه‌بندی پوسیدگی پروگزیمال' : 'Proximal Caries Classification'}</span>
+                                </div>
                                     <table className="w-full text-xs border-collapse">
                                         <thead>
                                             <tr className="bg-slate-50">
-                                                <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 w-12">{fa ? 'کد' : 'Code'}</th>
-                                                <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">{fa ? 'معنی' : 'Meaning'}</th>
-                                                <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">{fa ? 'وضعیت' : 'Status'}</th>
+                                                <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 w-16">{fa ? 'کد' : 'Code'}</th>
+                                                <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">{fa ? 'محل ضایعه' : 'Lesion Location'}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {icdasData.map(([code, meaning, status], i) => (
+                                            {proxData.map(([code, loc], i) => (
                                                 <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                                    <td className="py-1.5 px-3 font-mono font-bold text-center text-slate-900">{code}</td>
-                                                    <td className="py-1.5 px-3 text-slate-700 font-medium text-[11px]">{meaning}</td>
-                                                    <td className="py-1.5 px-3 text-slate-500 text-[10px]">{status}</td>
+                                                    <td className="py-2 px-3"><span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded font-mono">{code}</span></td>
+                                                    <td className="py-2 px-3 text-slate-700 font-medium text-[11px]">{loc}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
 
-                                {/* Bouncy Pinch Zoom Area */}
-                                <BouncyPinchZoom src="/images/icdas.png" alt="ICDAS Reference" />
-                            </div>
-                            {/* Proximal */}
-                            <div className="rounded-2xl border border-slate-200 overflow-hidden">                                <div className="bg-indigo-600 px-4 py-2 flex items-center justify-between">
-                                <span className="text-white text-xs font-bold tracking-wider">{fa ? 'پروگزیمال' : 'Proximal C'}</span>
-                                <span className="text-indigo-200 text-[8px] font-medium tracking-wider uppercase">{fa ? 'درجه‌بندی پوسیدگی پروگزیمال' : 'Proximal Caries Classification'}</span>
-                            </div>
-                                <table className="w-full text-xs border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50">
-                                            <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 w-16">{fa ? 'کد' : 'Code'}</th>
-                                            <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">{fa ? 'محل ضایعه' : 'Lesion Location'}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {proxData.map(([code, loc], i) => (
-                                            <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                                <td className="py-2 px-3"><span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded font-mono">{code}</span></td>
-                                                <td className="py-2 px-3 text-slate-700 font-medium text-[11px]">{loc}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* ── Action plan ── */}
-                        <div className="c-fade-up c-d3 space-y-3">
-                            <div className="flex items-center gap-2 px-1">
-                                <ClipboardCheck className="w-3.5 h-3.5 text-slate-400" />
-                                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{fa ? 'برنامه درمانی' : 'Action Plan'}</h3>
-                                <div className="flex-1 h-px bg-slate-100" />
-                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase ${results.finalCat === 'lowRisk' ? 'bg-emerald-50 text-emerald-600' : results.finalCat === 'moderateRisk' ? 'bg-amber-50 text-amber-600' : results.finalCat === 'highRisk' ? 'bg-red-50 text-red-600' : 'bg-slate-900 text-white'}`}>{t[results.finalCat]}</span>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div className="rounded-2xl border border-slate-200 overflow-hidden">
-                                    <div className="bg-slate-50 border-b border-slate-100 px-3 py-2">
-                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><Calendar className="w-3 h-3" />{t.recDiagnostics}</span>
+                            {/* ── Action plan ── */}
+                            <div className="c-fade-up c-d3 space-y-3">
+                                <div className="flex items-center gap-2 px-1">
+                                    <ClipboardCheck className="w-3.5 h-3.5 text-slate-400" />
+                                    <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{fa ? 'برنامه درمانی' : 'Action Plan'}</h3>
+                                    <div className="flex-1 h-px bg-slate-100" />
+                                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase ${results.finalCat === 'lowRisk' ? 'bg-emerald-50 text-emerald-600' : results.finalCat === 'moderateRisk' ? 'bg-amber-50 text-amber-600' : results.finalCat === 'highRisk' ? 'bg-red-50 text-red-600' : 'bg-slate-900 text-white'}`}>{t[results.finalCat]}</span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                                        <div className="bg-slate-50 border-b border-slate-100 px-3 py-2">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5"><Calendar className="w-3 h-3" />{t.recDiagnostics}</span>
+                                        </div>
+                                        <div className="p-3"><div dangerouslySetInnerHTML={{ __html: t[RecMap[results.finalCat].d] }} className="text-[12px] text-slate-700 leading-relaxed [&_ul]:space-y-2 [&_li]:text-[12px]" /></div>
                                     </div>
-                                    <div className="p-3"><div dangerouslySetInnerHTML={{ __html: t[RecMap[results.finalCat].d] }} className="text-[12px] text-slate-700 leading-relaxed [&_ul]:space-y-2 [&_li]:text-[12px]" /></div>
-                                </div>
-                                <div className="rounded-2xl border-2 border-slate-900 overflow-hidden">
-                                    <div className="bg-slate-900 px-3 py-2">
-                                        <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5"><Zap className="w-3 h-3" />{t.recInterventions}</span>
+                                    <div className="rounded-2xl border-2 border-slate-900 overflow-hidden">
+                                        <div className="bg-slate-900 px-3 py-2">
+                                            <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5"><Zap className="w-3 h-3" />{t.recInterventions}</span>
+                                        </div>
+                                        <div className="p-3"><div dangerouslySetInnerHTML={{ __html: t[RecMap[results.finalCat].i] }} className="text-[12px] text-slate-700 leading-relaxed [&_ul]:space-y-2 [&_li]:text-[12px]" /></div>
                                     </div>
-                                    <div className="p-3"><div dangerouslySetInnerHTML={{ __html: t[RecMap[results.finalCat].i] }} className="text-[12px] text-slate-700 leading-relaxed [&_ul]:space-y-2 [&_li]:text-[12px]" /></div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* ── Buttons ── */}
-                        <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-2.5">
-                            <button onClick={() => setShowPdf(true)} className="group relative cursor-pointer active:scale-[.97] transition-transform w-full sm:w-auto">
-                                <div className="absolute inset-0 bg-slate-600 rounded-xl translate-y-1" />
-                                <div className="relative bg-slate-700 text-white px-5 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 group-hover:translate-y-0.5 transition-transform"><Download className="w-4 h-4" />{fa ? 'خروجی PDF' : 'Export PDF'}</div>
-                            </button>
-                            <button onClick={submit} disabled={busy} className="group relative cursor-pointer active:scale-[.97] transition-transform disabled:opacity-50 w-full sm:w-auto">
-                                <div className="absolute inset-0 bg-slate-800 rounded-xl translate-y-1" />
-                                <div className="relative bg-slate-900 text-white px-5 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 group-hover:translate-y-0.5 transition-transform">
-                                    {busy ? <Activity className="animate-spin w-4 h-4" /> : <ClipboardCheck className="w-4 h-4" />}
-                                    {busy ? (fa ? 'ثبت...' : 'Saving...') : (fa ? 'ثبت و پایان' : 'Submit')}
-                                </div>
-                            </button>
+                            {/* ── Buttons ── */}
+                            <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-2.5">
+                                <button onClick={() => setShowPdf(true)} className="group relative cursor-pointer active:scale-[.97] transition-transform w-full sm:w-auto">
+                                    <div className="absolute inset-0 bg-slate-600 rounded-xl translate-y-1" />
+                                    <div className="relative bg-slate-700 text-white px-5 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 group-hover:translate-y-0.5 transition-transform"><Download className="w-4 h-4" />{fa ? 'خروجی PDF' : 'Export PDF'}</div>
+                                </button>
+                                <button onClick={submit} disabled={busy} className="group relative cursor-pointer active:scale-[.97] transition-transform disabled:opacity-50 w-full sm:w-auto">
+                                    <div className="absolute inset-0 bg-slate-800 rounded-xl translate-y-1" />
+                                    <div className="relative bg-slate-900 text-white px-5 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 group-hover:translate-y-0.5 transition-transform">
+                                        {busy ? <Activity className="animate-spin w-4 h-4" /> : <ClipboardCheck className="w-4 h-4" />}
+                                        {busy ? (fa ? 'ثبت...' : 'Saving...') : (fa ? 'ثبت و پایان' : 'Submit')}
+                                    </div>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
