@@ -62,12 +62,17 @@ if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
 @media print{@page{margin:0;size:A4}}
 
 html, body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow: hidden; /* Locks the window body from scrolling */
-        background-color: #ffffff;
-    }
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #ffffff;
+}
+* {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+::-webkit-scrollbar { width: 0; height: 0; }
 
     /* Screen preview: simulate A4 pages */
 
@@ -642,6 +647,7 @@ export default function CambraApp() {
     const [busy, setBusy] = useState(false);
     const [config, setConfig] = useState(null);
     const [showPdf, setShowPdf] = useState(false);
+    const mainScrollRef = useRef(null);
 
     const isAdmin = useMemo(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('admin') === ADMIN_KEY, []);
 
@@ -680,11 +686,13 @@ export default function CambraApp() {
 
     // useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }) }, [tab]);
     useEffect(() => {
-        // Delay scroll slightly to allow the DOM to mount the new tab's height
-        const timer = setTimeout(() => {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }, 50);
-        return () => clearTimeout(timer);
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (mainScrollRef.current) {
+                    mainScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            });
+        });
     }, [tab]);
 
     const results = useMemo(() => {
@@ -818,7 +826,7 @@ export default function CambraApp() {
             )}
 
             {/* MAIN - Scrollable Content Area Only */}
-            <main className="flex-1 overflow-y-auto px-4 md:px-6 py-6 pb-28">
+                <main ref={mainScrollRef} className="flex-1 overflow-y-auto px-4 md:px-6 py-6 pb-28" style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}>
                 <div className="max-w-2xl mx-auto">
                     {isW && <Welcome lang={lang} onStart={() => setTab('patient')} />}
 
@@ -923,62 +931,143 @@ export default function CambraApp() {
 
                         {/* RESULTS */}
                         <div className={`${tab !== 'results' ? 'hidden' : ''} space-y-5 pb-12`}>
-                            {/* ── Verdict banner ── */}
-                            <div className="c-fade-up">
-                                <div className={`flex flex-col sm:flex-row items-center sm:items-stretch border-2 border-slate-900 rounded-2xl overflow-hidden shadow-[4px_4px_0_#0f172a] ${catBg[results.finalCat]}`}>
+{/* ── Verdict banner ── */}
+<div className="c-fade-up">
+    <div className="relative rounded-2xl border-2 border-slate-900 overflow-hidden shadow-[4px_4px_0_#0f172a]">
+        
+        {/* Background — subtle gradient instead of harsh solid */}
+        <div className={`absolute inset-0 ${
+            results.finalCat === 'lowRisk' ? 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50' :
+            results.finalCat === 'moderateRisk' ? 'bg-gradient-to-br from-amber-50 via-white to-orange-50' :
+            results.finalCat === 'highRisk' ? 'bg-gradient-to-br from-red-50 via-white to-rose-50' :
+            'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
+        }`} />
 
-                                    {/* Mascot Image */}
-                                    <div className="w-full sm:w-1/3 p-6 flex items-center justify-center bg-black/10">
-                                        <CImg name={OUTCOME_IMAGES[results.finalCat]} alt="" className="w-40 sm:w-full max-w-[180px] drop-shadow-md c-pop" />
-                                    </div>
+        {/* Decorative corner accent */}
+        <div className={`absolute top-0 ${fa ? 'left-0' : 'right-0'} w-32 h-32 rounded-full blur-3xl opacity-20 ${
+            results.finalCat === 'lowRisk' ? 'bg-emerald-400' :
+            results.finalCat === 'moderateRisk' ? 'bg-amber-400' :
+            results.finalCat === 'highRisk' ? 'bg-red-400' :
+            'bg-red-600'
+        }`} />
 
-                                    {/* Content Side */}
-                                    <div className="w-full sm:w-2/3 p-5 flex flex-col justify-center">
-                                        <div className="flex items-start justify-between gap-4 mb-4">
-                                            <div>
-                                                <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-1 block">
-                                                    {fa ? 'نتیجه ارزیابی ریسک' : 'Risk Assessment Result'}
-                                                </span>
-                                                <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-none">
-                                                    {t[results.finalCat]}
-                                                </h2>
+        <div className="relative flex flex-col sm:flex-row items-center sm:items-stretch">
+            
+            {/* Mascot */}
+            <div className={`w-full sm:w-5/12 p-6 sm:p-8 flex items-center justify-center ${
+                results.finalCat === 'extremeRisk' ? 'bg-white/5' : 'bg-slate-900/[0.03]'
+            }`}>
+                <CImg 
+                    name={OUTCOME_IMAGES[results.finalCat]} 
+                    alt="" 
+                    className="w-36 sm:w-full max-w-[160px] drop-shadow-lg c-pop" 
+                />
+            </div>
 
-                                                {/* Overrides */}
-                                                {(results.dOverride || results.eOverride || results.orthoOverride) && (
-                                                    <div className="flex flex-wrap gap-1.5 mt-3">
-                                                        {results.dOverride && <span className="bg-white/20 text-white text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {t.diseaseOverride}</span>}
-                                                        {results.eOverride && <span className="bg-white/20 text-white text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><Droplets className="w-3 h-3" /> {t.extremeOverride}</span>}
-                                                        {results.orthoOverride && <span className="bg-white/20 text-white text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {t.orthoOverride}</span>}
-                                                    </div>
-                                                )}
-                                            </div>
+            {/* Content */}
+            <div className="w-full sm:w-7/12 p-5 sm:p-6 flex flex-col justify-center gap-4">
+                
+                {/* Risk Level Label */}
+                <div>
+                    <span className={`text-[9px] font-bold uppercase tracking-[.2em] ${
+                        results.finalCat === 'extremeRisk' ? 'text-red-300' : 'text-slate-400'
+                    }`}>
+                        {fa ? 'نتیجه ارزیابی ریسک' : 'Risk Assessment Result'}
+                    </span>
+                    
+                    <h2 className={`text-3xl sm:text-4xl font-black tracking-tight leading-none mt-1.5 ${
+                        results.finalCat === 'lowRisk' ? 'text-emerald-700' :
+                        results.finalCat === 'moderateRisk' ? 'text-amber-700' :
+                        results.finalCat === 'highRisk' ? 'text-red-700' :
+                        'text-white'
+                    }`}>
+                        {t[results.finalCat]}
+                    </h2>
 
-                                            {/* Total Score Chip */}
-                                            <div className="flex-shrink-0 text-center bg-white rounded-xl p-3 border-2 border-slate-900 shadow-[2px_2px_0_#0f172a] min-w-[70px]">
-                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-0.5">{t.totalScore}</span>
-                                                <div className="text-2xl font-black font-mono text-slate-900" dir="ltr">
-                                                    {results.score > 0 ? '+' : ''}{toFa(results.score, lang)}
-                                                </div>
-                                            </div>
-                                        </div>
+                    {/* Override pills */}
+                    {(results.dOverride || results.eOverride || results.orthoOverride) && (
+                        <div className="flex flex-wrap gap-1.5 mt-3">
+                            {results.dOverride && (
+                                <span className={`text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${
+                                    results.finalCat === 'extremeRisk' 
+                                        ? 'bg-white/10 text-red-200 border border-white/10' 
+                                        : 'bg-red-100 text-red-700 border border-red-200'
+                                }`}>
+                                    <AlertCircle className="w-3 h-3" /> {t.diseaseOverride}
+                                </span>
+                            )}
+                            {results.eOverride && (
+                                <span className={`text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${
+                                    results.finalCat === 'extremeRisk' 
+                                        ? 'bg-white/10 text-amber-200 border border-white/10' 
+                                        : 'bg-amber-100 text-amber-700 border border-amber-200'
+                                }`}>
+                                    <Droplets className="w-3 h-3" /> {t.extremeOverride}
+                                </span>
+                            )}
+                            {results.orthoOverride && (
+                                <span className={`text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${
+                                    results.finalCat === 'extremeRisk' 
+                                        ? 'bg-white/10 text-slate-200 border border-white/10' 
+                                        : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                }`}>
+                                    <AlertCircle className="w-3 h-3" /> {t.orthoOverride}
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
 
-                                        {/* Score Breakdown Bar */}
-                                        <div className="flex items-center gap-2 mt-auto pt-3 border-t border-white/20" dir="ltr">
-                                            <span className="flex items-center justify-center px-2 py-1 rounded bg-red-500 text-white text-[11px] font-bold font-mono border border-slate-900">+{toFa(results.dScore, lang)}</span>
-                                            <span className="flex items-center justify-center px-2 py-1 rounded bg-amber-400 text-slate-900 text-[11px] font-bold font-mono border border-slate-900">+{toFa(results.rScore, lang)}</span>
-                                            <span className="flex items-center justify-center px-2 py-1 rounded bg-emerald-500 text-white text-[11px] font-bold font-mono border border-slate-900">−{toFa(results.pScore, lang)}</span>
-                                        </div>
-                                    </div>
-                                </div>
+                {/* Score chip + breakdown — unified row */}
+                <div className={`flex items-center gap-3 pt-4 mt-auto ${
+                    results.finalCat === 'extremeRisk' ? 'border-t border-white/10' : 'border-t border-slate-200/60'
+                }`}>
+                    {/* Net score */}
+                    <div className={`flex-shrink-0 px-4 py-2.5 rounded-xl border-2 text-center min-w-[72px] ${
+                        results.finalCat === 'extremeRisk' 
+                            ? 'border-white/20 bg-white/5' 
+                            : 'border-slate-900 bg-white shadow-[2px_2px_0_#0f172a]'
+                    }`}>
+                        <div className={`text-2xl font-black font-mono leading-none ${
+                            results.finalCat === 'extremeRisk' ? 'text-white' : 'text-slate-900'
+                        }`} dir="ltr">
+                            {results.score > 0 ? '+' : ''}{toFa(results.score, lang)}
+                        </div>
+                        <span className={`text-[8px] font-bold uppercase tracking-widest ${
+                            results.finalCat === 'extremeRisk' ? 'text-white/50' : 'text-slate-400'
+                        }`}>{t.totalScore}</span>
+                    </div>
 
-                                {/* Salivation Status */}
-                                {results.hasHyposalivation && (
-                                    <div className="mt-4 bg-slate-900 text-white border-2 border-slate-900 rounded-xl px-5 py-3 flex items-center gap-3 shadow-[4px_4px_0_#cbd5e1]">
-                                        <Droplets className="w-5 h-5 text-amber-400 flex-shrink-0" />
-                                        <span className="text-sm font-semibold">{fa ? 'هیپوسالیواسیون — جریان بزاق کاهش‌یافته' : 'Hyposalivation — reduced salivary flow'}</span>
-                                    </div>
-                                )}
-                            </div>
+                    {/* Breakdown chips */}
+                    <div className="flex flex-wrap gap-1.5" dir="ltr">
+                        <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500 text-white text-[11px] font-bold font-mono shadow-sm">
+                            <Stethoscope className="w-3 h-3 opacity-70" />+{toFa(results.dScore, lang)}
+                        </span>
+                        <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-400 text-slate-900 text-[11px] font-bold font-mono shadow-sm">
+                            <Zap className="w-3 h-3 opacity-70" />+{toFa(results.rScore, lang)}
+                        </span>
+                        <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white text-[11px] font-bold font-mono shadow-sm">
+                            <ShieldCheck className="w-3 h-3 opacity-70" />−{toFa(results.pScore, lang)}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {/* Hyposalivation alert */}
+    {results.hasHyposalivation && (
+        <div className="mt-3 bg-gradient-to-r from-slate-900 to-slate-800 text-white border-2 border-slate-900 rounded-xl px-5 py-3 flex items-center gap-3 shadow-[3px_3px_0_#cbd5e1]">
+            <div className="w-8 h-8 rounded-lg bg-amber-400/20 flex items-center justify-center flex-shrink-0">
+                <Droplets className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+                <span className="text-xs font-bold block">{fa ? 'هیپوسالیواسیون' : 'Hyposalivation'}</span>
+                <span className="text-[11px] text-slate-400">{fa ? 'جریان بزاق کاهش‌یافته' : 'Reduced salivary flow detected'}</span>
+            </div>
+        </div>
+    )}
+</div>
 
 
                             {/* ── Score breakdown bars ── */}
@@ -1051,7 +1140,7 @@ export default function CambraApp() {
                                     </div>
 
                                     {/* Bouncy Pinch Zoom Area */}
-                                    <div class="md:col-span-2">
+                                    <div className="md:col-span-2">
                                     <BouncyPinchZoom src="/images/icdas.png" alt="ICDAS Reference" />
                                     </div>
                                 </div>
