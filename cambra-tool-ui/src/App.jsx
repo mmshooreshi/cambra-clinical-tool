@@ -561,7 +561,7 @@ function PdfModal({ open, onClose, lang, patient, results, config, diseaseInd, r
             </div>
             <div class="info-grid">
                 <div class="info-card"><div class="info-label">${t?.patientName}</div><div class="info-value">${patient.name || '—'}</div></div>
-                <div class="info-card"><div class="info-label">${t?.chartNo}</div><div class="info-value mono">${toFa(patient.chartNo, lang) || '—'}</div></div>
+                <div class="info-card"><div class="info-label">${t?.chartNo}</div><div class="info-value">${toFa(patient.chartNo, lang) || '—'}</div></div>
                 <div class="info-card"><div class="info-label">${t?.date}</div><div class="info-value">${dateD}</div></div>
                 <div class="info-card"><div class="info-label">${t?.assessmentType}</div><div class="info-value">${patient.assessmentType === 'baseline' ? t?.baseline : t?.recall}</div></div>
             </div>
