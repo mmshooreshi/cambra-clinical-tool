@@ -7,7 +7,7 @@ import {
     ChevronDown, HeartPulse, X, Download,
     Settings, Shuffle, FileText, Minus, Layers, Eye, EyeOff
 } from 'lucide-react';
-import BouncyPinchZoom from '@/components/BouncyPinchZoom';
+import BouncyPinchZoom from './components/BouncyPinchZoom';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GLOBAL STYLES
@@ -59,8 +59,14 @@ if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
 
     .c-blink{animation:cBlink 1s step-end infinite}
 
-    @media print{@page{margin:0;size:A4}}
+@media print{@page{margin:0;size:A4}}
 
+    html, body {
+        height: 100%;
+        overflow-x: hidden;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+    }
     /* Screen preview: simulate A4 pages */
 
     .lhsmall{
@@ -773,7 +779,7 @@ export default function CambraApp() {
 
 
     return (
-        <div dir={fa ? 'rtl' : 'ltr'} className={`min-h-screen bg-white text-slate-900 ${isW ? '' : 'pb-2'}`} style={{ fontFamily: "'Vazirmatn',system-ui,sans-serif" }}>
+        <div dir={fa ? 'rtl' : 'ltr'} className={`min-h-screen bg-white text-slate-900 ${isW ? '' : 'pb-20'}`} style={{ fontFamily: "'Vazirmatn',system-ui,sans-serif" }}>
 
             {/* HEADER */}
             <header className="bg-white border-b border-slate-100 px-4 py-2 sticky top-0 z-30 flex items-center justify-between">
