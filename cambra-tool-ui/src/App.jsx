@@ -222,7 +222,7 @@ function Portal({ anchorRef, open, onClose, children, maxH = 420 }) {
             left: pos.left,
             width: pos.width,
             maxHeight: pos.actualMaxH,
-            overflowY: 'auto', // Enables internal scrolling if clamped
+            // overflowY: 'auto', // Enables internal scrolling if clamped
             transformOrigin: flip ? 'bottom center' : 'top center'
         }}>
             {children}
@@ -918,17 +918,17 @@ export default function CambraApp() {
                         {/* ── Verdict banner ── */}
                         <div className="c-fade-up">
                             <div className={`relative overflow-hidden rounded-3xl border-2 transition-colors duration-500 shadow-sm ${results.finalCat === 'lowRisk' ? 'bg-emerald-50 border-emerald-200' :
-                                    results.finalCat === 'moderateRisk' ? 'bg-amber-50 border-amber-200' :
-                                        results.finalCat === 'highRisk' ? 'bg-red-50 border-red-200' :
-                                            'bg-rose-50 border-rose-300'
+                                results.finalCat === 'moderateRisk' ? 'bg-amber-50 border-amber-200' :
+                                    results.finalCat === 'highRisk' ? 'bg-red-50 border-red-200' :
+                                        'bg-rose-50 border-rose-300'
                                 }`}>
 
                                 {/* Soft Animated Glow */}
                                 <div className="absolute top-0 right-0 p-12 opacity-30 pointer-events-none mix-blend-multiply c-pulse-dot">
                                     <div className={`w-32 h-32 rounded-full blur-3xl ${results.finalCat === 'lowRisk' ? 'bg-emerald-300' :
-                                            results.finalCat === 'moderateRisk' ? 'bg-amber-300' :
-                                                results.finalCat === 'highRisk' ? 'bg-red-300' :
-                                                    'bg-rose-300'
+                                        results.finalCat === 'moderateRisk' ? 'bg-amber-300' :
+                                            results.finalCat === 'highRisk' ? 'bg-red-300' :
+                                                'bg-rose-300'
                                         }`} />
                                 </div>
 
@@ -942,17 +942,17 @@ export default function CambraApp() {
                                     <div className="flex-1 flex flex-col justify-center text-center sm:text-start">
                                         <div className="mb-2">
                                             <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-white/60 backdrop-blur-sm border shadow-sm ${results.finalCat === 'lowRisk' ? 'text-emerald-700 border-emerald-200' :
-                                                    results.finalCat === 'moderateRisk' ? 'text-amber-700 border-amber-200' :
-                                                        results.finalCat === 'highRisk' ? 'text-red-700 border-red-200' :
-                                                            'text-rose-800 border-rose-300'
+                                                results.finalCat === 'moderateRisk' ? 'text-amber-700 border-amber-200' :
+                                                    results.finalCat === 'highRisk' ? 'text-red-700 border-red-200' :
+                                                        'text-rose-800 border-rose-300'
                                                 }`}>
                                                 {fa ? 'نتیجه ارزیابی ریسک' : 'Risk Assessment Result'}
                                             </span>
                                         </div>
                                         <h2 className={`text-4xl sm:text-5xl font-black tracking-tight mb-3 ${results.finalCat === 'lowRisk' ? 'text-emerald-700' :
-                                                results.finalCat === 'moderateRisk' ? 'text-amber-700' :
-                                                    results.finalCat === 'highRisk' ? 'text-red-700' :
-                                                        'text-rose-900'
+                                            results.finalCat === 'moderateRisk' ? 'text-amber-700' :
+                                                results.finalCat === 'highRisk' ? 'text-red-700' :
+                                                    'text-rose-900'
                                             }`}>
                                             {t[results.finalCat]}
                                         </h2>
@@ -1062,14 +1062,29 @@ export default function CambraApp() {
                                         ))}
                                     </tbody>
                                 </table>
+
+                                {/* --- ICDAS IMAGE ADDED TO UI HERE --- */}
+                                <div className="p-4 border-t border-slate-100 bg-white flex justify-center">
+                                    <img
+                                        src="/images/ICADS.png"
+                                        alt="ICDAS Reference"
+                                        className="max-w-full h-auto rounded-xl drop-shadow-sm"
+                                        style={{ maxHeight: '220px', objectFit: 'contain' }}
+                                        onError={(e) => {
+                                            console.error("Image failed to load:", e.target.src);
+                                            e.target.style.display = 'none';
+                                        }}
+                                    />
+                                </div>
+                                {/* ------------------------------------ */}
+
                             </div>
 
                             {/* Proximal */}
-                            <div className="rounded-2xl border border-slate-200 overflow-hidden">
-                                <div className="bg-indigo-600 px-4 py-2 flex items-center justify-between">
-                                    <span className="text-white text-xs font-bold tracking-wider">{fa ? 'پروگزیمال' : 'Proximal C'}</span>
-                                    <span className="text-indigo-200 text-[8px] font-medium tracking-wider uppercase">{fa ? 'درجه‌بندی پوسیدگی پروگزیمال' : 'Proximal Caries Classification'}</span>
-                                </div>
+                            <div className="rounded-2xl border border-slate-200 overflow-hidden">                                <div className="bg-indigo-600 px-4 py-2 flex items-center justify-between">
+                                <span className="text-white text-xs font-bold tracking-wider">{fa ? 'پروگزیمال' : 'Proximal C'}</span>
+                                <span className="text-indigo-200 text-[8px] font-medium tracking-wider uppercase">{fa ? 'درجه‌بندی پوسیدگی پروگزیمال' : 'Proximal Caries Classification'}</span>
+                            </div>
                                 <table className="w-full text-xs border-collapse">
                                     <thead>
                                         <tr className="bg-slate-50">
