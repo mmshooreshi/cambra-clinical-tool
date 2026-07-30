@@ -18,6 +18,11 @@ if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
     s.id = STYLE_ID;
     s.textContent = `
     @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
+    /* Disable letter spacing for Persian text globally */
+    [dir="rtl"], [dir="rtl"] * {
+        letter-spacing: 0 !important;
+        font-feature-settings: "kern" 0, "asvm" 0 !important;
+    }
 
     @keyframes cFadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
     @keyframes cSlideUp { from{opacity:0;transform:translateY(100%)} to{opacity:1;transform:translateY(0)} }
@@ -677,6 +682,13 @@ function PdfModal({ open, onClose, lang, patient, results, config, diseaseInd, r
 <title>CAMBRA — ${patient.name}</title>
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+*[dir="rtl"] {
+    letter-spacing: 0 !important;
+}
+*[dir="rtl"] h1, *[dir="rtl"] h2, *[dir="rtl"] h3, *[dir="rtl"] .protocol, *[dir="rtl"] .verdict-eyebrow, *[dir="rtl"] .info-label {
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Vazirmatn','Inter',system-ui,sans-serif;color:#1e293b;font-size:11px;line-height:1.7;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 @page{size:A4;margin:12mm 14mm}
@@ -685,7 +697,15 @@ body{font-family:'Vazirmatn','Inter',system-ui,sans-serif;color:#1e293b;font-siz
 .header-left{display:flex;align-items:center;gap:12px}
 .logo-mark{width:40px;height:40px;background:#0f172a;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:20px;font-family:'Inter','Vazirmatn',sans-serif}
 .header-left h1{font-size:24px;font-weight:900;letter-spacing:-1.5px;line-height:1;color:#0f172a;font-family:'Inter','Vazirmatn',sans-serif}
-.header-left .protocol{font-size:7px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;margin-top:3px}
+.header-left .protocol {
+    font-size: 7px; font-weight: 700;
+    text-transform: uppercase;
+    margin-top: 3px;
+}
+html[lang="en"] .header-left .protocol {
+    letter-spacing: 3px;
+}
+    
 .header-right{text-align:${fa ? 'left' : 'right'}}
 .header-right .date{font-size:9px;color:#94a3b8;font-weight:600}
 .header-right .patient-name{font-size:10px;font-weight:700;color:#334155;margin-top:2px}
@@ -708,7 +728,15 @@ section{margin-bottom:20px;break-inside:avoid;page-break-inside:avoid}
 .verdict-card{border:2px solid;border-radius:12px;overflow:hidden}
 .verdict-main{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px 24px;flex-wrap:wrap}
 .verdict-left{flex:1;min-width:200px}
-.verdict-eyebrow{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:3px;margin-bottom:4px}
+.verdict-eyebrow {
+    font-size: 8px; font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+/* Re-apply only for English */
+html[lang="en"] .verdict-eyebrow {
+    letter-spacing: 2px;
+}
 .verdict-title{font-size:32px;font-weight:900;letter-spacing:-1px;line-height:1.1}
 .verdict-override{display:inline-block;font-size:8px;font-weight:700;padding:3px 8px;border-radius:5px;margin-top:6px;margin-${fa ? 'left' : 'right'}:4px}
 .verdict-score-box{border:2px solid;border-radius:10px;padding:12px 20px;text-align:center;min-width:100px;background:rgba(255,255,255,0.85)}
