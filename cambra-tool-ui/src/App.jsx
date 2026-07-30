@@ -546,7 +546,7 @@ function PdfModal({ open, onClose, lang, patient, results, config, diseaseInd, r
         const dateD = (() => { if (!patient.date) return ''; const [y, m, d] = patient.date.split('-').map(Number); return fa ? `${toFa(d, 'fa')} ${JM[m - 1]} ${toFa(y, 'fa')}` : `${GM[m - 1]} ${d}, ${y}`; })();
         const rl = (arr, pfx) => arr.map((v, i) => v ? t?.[`${pfx}_${i + 1}`] : null).filter(Boolean);
         const RM = { lowRisk: { d: 'rec_low_diag', i: 'rec_low_int' }, moderateRisk: { d: 'rec_mod_diag', i: 'rec_mod_int' }, highRisk: { d: 'rec_high_diag', i: 'rec_high_int' }, extremeRisk: { d: 'rec_ext_diag', i: 'rec_ext_int' } };
-        const icdasImgSrc = `${window.location.origin}/images/icdas.png`;
+        const icdasImgSrc = `${window.location.origin}/images/icdas-horizontal.png`;
 
         let body = '';
 
