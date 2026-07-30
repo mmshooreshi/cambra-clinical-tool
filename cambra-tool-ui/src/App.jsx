@@ -143,7 +143,7 @@ const ds = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart
 // ═══════════════════════════════════════════════════════════════════════════════
 // PORTAL DROPDOWN
 // ═══════════════════════════════════════════════════════════════════════════════
-function Portal({ anchorRef, open, onClose, children, maxH = 420 }) {
+function PortalLegacy({ anchorRef, open, onClose, children, maxH = 420 }) {
     const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
     const [flip, setFlip] = useState(false);
     const ref = useRef(null);
@@ -161,6 +161,74 @@ function Portal({ anchorRef, open, onClose, children, maxH = 420 }) {
     }, [open, onClose, anchorRef]);
     if (!open) return null;
     return createPortal(<div ref={ref} className="c-scale-in" style={{ position: 'absolute', zIndex: 9999, top: flip ? 'auto' : pos.top, bottom: flip ? `${window.innerHeight - pos.top + 4}px` : 'auto', left: pos.left, width: pos.width, maxHeight: maxH, transformOrigin: flip ? 'bottom center' : 'top center' }}>{children}</div>, document.body);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PORTAL DROPDOWN
+// ═══════════════════════════════════════════════════════════════════════════════
+function Portal({ anchorRef, open, onClose, children, maxH = 420 }) {
+    const [pos, setPos] = useState({ top: 'auto', bottom: 'auto', left: 0, width: 0, actualMaxH: maxH });
+    const [flip, setFlip] = useState(false);
+    const ref = useRef(null);
+
+    useEffect(() => {
+        if (!open || !anchorRef.current) return;
+        const u = () => {
+            const r = anchorRef.current.getBoundingClientRect();
+            // Calculate available space in viewport
+            const spaceBelow = window.innerHeight - r.bottom - 16;
+            const spaceAbove = r.top - 16;
+            const shouldFlip = spaceBelow < maxH && spaceAbove > spaceBelow;
+
+            // Strictly clamp maximum height so it never exits the window
+            const actualMaxH = Math.min(maxH, shouldFlip ? spaceAbove : spaceBelow);
+
+            // Constrain width and left position to prevent horizontal overflow on mobile
+            const winW = window.innerWidth;
+            let finalWidth = Math.max(r.width, 280);
+            if (finalWidth > winW - 32) finalWidth = winW - 32; // 16px padding on sides
+
+            let finalLeft = r.left; // Use Fixed positioning so we drop window.scrollX
+            if (finalLeft + finalWidth > winW - 16) finalLeft = winW - finalWidth - 16;
+            if (finalLeft < 16) finalLeft = 16;
+
+            setFlip(shouldFlip);
+            setPos({
+                top: shouldFlip ? 'auto' : r.bottom + 4,
+                bottom: shouldFlip ? window.innerHeight - r.top + 4 : 'auto',
+                left: finalLeft,
+                width: finalWidth,
+                actualMaxH
+            });
+        };
+        u(); window.addEventListener('scroll', u, true); window.addEventListener('resize', u);
+        return () => { window.removeEventListener('scroll', u, true); window.removeEventListener('resize', u) };
+    }, [open, anchorRef, maxH]);
+
+    useEffect(() => {
+        if (!open) return;
+        const h = e => { if (anchorRef.current?.contains(e.target) || ref.current?.contains(e.target)) return; onClose() };
+        document.addEventListener('mousedown', h); document.addEventListener('touchstart', h);
+        return () => { document.removeEventListener('mousedown', h); document.removeEventListener('touchstart', h) };
+    }, [open, onClose, anchorRef]);
+
+    if (!open) return null;
+    return createPortal(
+        <div ref={ref} className="c-scale-in" style={{
+            position: 'fixed', // Changed from absolute to fixed to ignore body scroll
+            zIndex: 9999,
+            top: pos.top,
+            bottom: pos.bottom,
+            left: pos.left,
+            width: pos.width,
+            maxHeight: pos.actualMaxH,
+            overflowY: 'auto', // Enables internal scrolling if clamped
+            transformOrigin: flip ? 'bottom center' : 'top center'
+        }}>
+            {children}
+        </div>,
+        document.body
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -314,12 +382,12 @@ function Welcome({ lang, onStart }) {
                         CAMBRA
                     </h1>
                     <div className="h-px w-12 bg-slate-300 mx-auto" />
-                        <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-xs mx-auto">
-                            {fa
-                                ? 'ابزار بالینی ارزیابی ریسک پوسیدگی دندان. اطلاعات بیمار را وارد کنید و برنامه درمانی دریافت کنید.'
-                                : 'Clinical caries risk assessment tool. Enter patient data and receive a personalised treatment plan.'
-                            }
-                        </p>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-xs mx-auto">
+                        {fa
+                            ? 'ابزار بالینی ارزیابی ریسک پوسیدگی دندان. اطلاعات بیمار را وارد کنید و برنامه درمانی دریافت کنید.'
+                            : 'Clinical caries risk assessment tool. Enter patient data and receive a personalised treatment plan.'
+                        }
+                    </p>
                 </div>
 
                 {/* Animated protocol name */}
@@ -496,7 +564,17 @@ th{background:#f1f5f9;font-weight:700;font-size:9px;text-transform:uppercase;let
 @media print{
   .pw>thead td,.pw>tbody td,.pw>tfoot td{padding-left:0;padding-right:0}
 }
-  
+/* Hide scrollbars for horizontal tab rows */
+.hide-scroll::-webkit-scrollbar { display: none; }
+.hide-scroll { -ms-overflow-style: none; scrollbar-width: none; scroll-behavior: smooth; }
+
+/* Prevent iOS auto-zoom on inputs while keeping accessible pinch-to-zoom */
+@media screen and (max-width: 768px) {
+    input[type="text"], input[type="number"], input[type="tel"], select, textarea {
+        font-size: 16px !important;
+    }
+}
+    
 </style></head><body>
 <table class="pw"><thead><tr><td><div class="pw-top"></div></td></tr></thead><tbody><tr><td>
 <div class="page"><div class="hdr"><div class="hdr-l"><div class="logo">C</div><div><h1>CAMBRA</h1><p>${fa ? 'گزارش ارزیابی ریسک پوسیدگی' : 'Caries Risk Assessment Report'}</p></div></div><div class="hdr-r"><div class="date">${dateD}</div><div class="badge" style="background:${rc[results?.finalCat]}">${catL}</div>${patient.name ? `<div class="name">${patient.name}</div>` : ''}</div></div>
@@ -591,7 +669,14 @@ export default function CambraApp() {
             }).catch(console.error);
     }, []);
 
-    useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }) }, [tab]);
+    // useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }) }, [tab]);
+    useEffect(() => {
+        // Delay scroll slightly to allow the DOM to mount the new tab's height
+        const timer = setTimeout(() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 50);
+        return () => clearTimeout(timer);
+    }, [tab]);
 
     const results = useMemo(() => {
         if (!config) return null; const s = config.settings;
@@ -705,10 +790,11 @@ export default function CambraApp() {
 
             {/* TABS */}
             {!isW && (
-                <div className="bg-white border-b border-slate-100 sticky top-[40px] z-20">
-                    <div className="max-w-2xl mx-auto flex">
+                <div className="bg-white border-b border-slate-100 sticky top-[40px] z-20 overflow-x-auto hide-scroll">
+                    <div className="flex w-full max-w-2xl mx-auto min-w-max px-2 sm:px-0">
                         {hTabs.map(tb => (
-                            <button key={tb.id} onClick={() => setTab(tb.id)} className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 text-[9px] font-semibold border-b-2 transition-all cursor-pointer ${tab === tb.id ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                            <button key={tb.id} onClick={() => setTab(tb.id)} className={`flex-1 min-w-[85px] flex flex-col items-center gap-1 py-2 text-[10px] sm:text-[11px] font-semibold border-b-2 transition-all cursor-pointer ${tab === tb.id ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                                {/* ... image and text ... */}
                                 {/* <tb.icon className={`w-3 h-3 ${tab===tb.id?'text-slate-900':'text-slate-300'}`}/> */}
 
                                 <CImg
@@ -774,8 +860,8 @@ export default function CambraApp() {
                     {/* DISEASE + RISK */}
                     <div className={`${tab !== 'disease' ? 'hidden' : ''} space-y-5`}>
                         <div className="c-fade-up rounded-2xl border border-slate-200 overflow-visible bg-white">
-                            <div className="px-4 py-1 border-b border-red-100 bg-red-50/50 flex items-center gap-3 rounded-t-2xl">
-                                <CImg name="ui_header_disease_single_23" alt="" className="w-24 h-24 -mt-6 -mb-4 scale-120 -mx-2 flex-shrink-0" />
+                            <div className="px-4 py-3 border-b border-red-100 bg-red-50/50 flex items-center gap-4 rounded-t-2xl relative">
+                                <CImg name="ui_header_disease_single_23" alt="" className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0" />
                                 <div>
                                     <h2 className="text-[14px] font-bold text-red-700 uppercase tracking-wider">{t.diseaseIndicators}</h2>
                                     <p className="text-[12px] text-red-400 mt-0.5">{t.diseaseIndSubtitle}</p>
@@ -791,8 +877,8 @@ export default function CambraApp() {
                             </div>
                         </div>
                         <div className="c-fade-up c-d2 rounded-2xl border border-slate-200 overflow-visible bg-white">
-                            <div className="px-4 py-1 border-b border-amber-100 bg-amber-50/50 flex items-center gap-3 rounded-t-2xl">
-                                <CImg name="ui_header_risk_single_21" alt="" className="w-24 h-24 -mt-8 -mb-4 scale-120 -mx-2 flex-shrink-0" />
+                            <div className="px-4 py-3 border-b border-amber-100 bg-amber-50/50 flex items-center gap-4 rounded-t-2xl relative">
+                                <CImg name="ui_header_risk_single_21" alt="" className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0" />
                                 <div>
                                     <h2 className="text-[14px] font-bold text-amber-700 uppercase tracking-wider">{t.riskFactors}</h2>
                                     <p className="text-[12px] text-amber-400 mt-0.5">{t.riskFactSubtitle}</p>
@@ -810,8 +896,8 @@ export default function CambraApp() {
                     {/* PROTECTIVE */}
                     <div className={tab !== 'protective' ? 'hidden' : ''}>
                         <div className="c-fade-up rounded-2xl border border-slate-200 overflow-visible bg-white">
-                            <div className="px-4 py-1 border-b border-emerald-100 bg-emerald-50/50 flex items-center gap-3 rounded-t-2xl">
-                                <CImg name="ui_header_protective_single_22" alt="" className="w-24 h-24 -mt-4 -mb-2 scale-120 -mx-2 flex-shrink-0" />
+                            <div className="px-4 py-3 border-b border-emerald-100 bg-emerald-50/50 flex items-center gap-4 rounded-t-2xl relative">
+                                <CImg name="ui_header_protective_single_22" alt="" className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0" />
                                 <div>
                                     <h2 className="text-[14px] font-bold text-emerald-700 uppercase tracking-wider">{t.protectiveFactors}</h2>
                                     <p className="text-[12px] text-emerald-400 mt-0.5">{t.protFactSubtitle}</p>
@@ -830,59 +916,85 @@ export default function CambraApp() {
                     <div className={`${tab !== 'results' ? 'hidden' : ''} space-y-5 pb-12`}>
 
                         {/* ── Verdict banner ── */}
-                        <div className="c-fade-up flex">
-                            <CImg name={OUTCOME_IMAGES[results.finalCat]} alt="" className="w-50 z-100 h-fill  flex-shrink-0 "/>
-                            <div className={`w-full rounded-2xl overflow-hidden border-2 border-slate-900 shadow-[4px_4px_0_#0f172a] ${catBg[results.finalCat]}`}>
-                                {/* Hatching texture */}
-                                
-                                <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(135deg,#fff 0,#fff 1px,transparent 0,transparent 8px)' }} />
-                                <div className="relative p-5 sm:p-7">
-                                    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
-                                        {/* Verdict text */}
+                        <div className="c-fade-up">
+                            <div className={`relative overflow-hidden rounded-3xl border-2 transition-colors duration-500 shadow-sm ${results.finalCat === 'lowRisk' ? 'bg-emerald-50 border-emerald-200' :
+                                    results.finalCat === 'moderateRisk' ? 'bg-amber-50 border-amber-200' :
+                                        results.finalCat === 'highRisk' ? 'bg-red-50 border-red-200' :
+                                            'bg-rose-50 border-rose-300'
+                                }`}>
 
-      
-                                        <div className="flex items-start gap-3 sm:gap-4">
-         
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-3">
-                                                    
-                                                    <span className={`text-[14px] font-bold uppercase tracking-[.2em] ${catText[results.finalCat]} opacity-60`}>{fa ? 'نتیجه ارزیابی' : 'Assessment Result'}</span>
-                                                </div>
-                                                <h2 className={`text-4xl sm:text-5xl font-black tracking-tight leading-none ${catText[results.finalCat]}`}>{t[results.finalCat]}</h2>
-                                                {/* Override tags */}
-                                                <div className="flex flex-wrap gap-1.5 mt-3">
-                                                    {results.dOverride && <span className="bg-white/15 text-white/90 text-[9px] font-semibold px-2 py-0.5 rounded-md">{t.diseaseOverride}</span>}
-                                                    {results.eOverride && <span className="bg-white/15 text-white/90 text-[9px] font-semibold px-2 py-0.5 rounded-md">{t.extremeOverride}</span>}
-                                                    {results.orthoOverride && <span className="bg-white/15 text-white/90 text-[9px] font-semibold px-2 py-0.5 rounded-md">{t.orthoOverride}</span>}
-                                                </div>
-                                            </div>
-                                        </div>
+                                {/* Soft Animated Glow */}
+                                <div className="absolute top-0 right-0 p-12 opacity-30 pointer-events-none mix-blend-multiply c-pulse-dot">
+                                    <div className={`w-32 h-32 rounded-full blur-3xl ${results.finalCat === 'lowRisk' ? 'bg-emerald-300' :
+                                            results.finalCat === 'moderateRisk' ? 'bg-amber-300' :
+                                                results.finalCat === 'highRisk' ? 'bg-red-300' :
+                                                    'bg-rose-300'
+                                        }`} />
+                                </div>
 
-                                        {/* Score column */}
-                                        <div className="flex flex-col gap-2 sm:items-end">
-                                            <div className="bg-black/25 backdrop-blur rounded-xl px-4 py-2.5 text-center min-w-[100px]" dir="ltr">
-                                                <div className={`text-3xl font-black font-mono leading-none ${catText[results.finalCat]}`}>
-                                                    {results.score > 0 ? '+' : ''}{toFa(results.score, lang)}
-                                                </div>
-                                                <div className="text-[8px] font-bold uppercase tracking-widest text-white/40 mt-1">{t.totalScore}</div>
-                                            </div>
-                                            {/* Mini breakdown */}
-                                            <div className="flex gap-1.5" dir="ltr">
-                                                <span className="bg-red-500/30 text-red-100 text-[10px] font-bold font-mono px-1.5 py-0.5 rounded">+{toFa(results.dScore, lang)}</span>
-                                                <span className="bg-amber-500/30 text-amber-100 text-[10px] font-bold font-mono px-1.5 py-0.5 rounded">+{toFa(results.rScore, lang)}</span>
-                                                <span className="bg-emerald-500/30 text-emerald-100 text-[10px] font-bold font-mono px-1.5 py-0.5 rounded">−{toFa(results.pScore, lang)}</span>
-                                            </div>
-                                        </div>
+                                <div className="relative p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-stretch gap-6 sm:gap-8">
+                                    {/* Mascot / Illustration */}
+                                    <div className="flex-shrink-0 w-32 h-32 sm:w-40 sm:h-40 c-pop">
+                                        <CImg name={OUTCOME_IMAGES[results.finalCat]} alt="" className="w-full h-full drop-shadow-xl" />
                                     </div>
 
-                                    {/* Salivation */}
-                                    {results.hasHyposalivation && (
-                                        <div className="mt-4 flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2 border border-white/10">
-                                            <Droplets className="w-3.5 h-3.5 text-red-300 flex-shrink-0" />
-                                            <span className="text-red-200 text-[11px] font-semibold">{fa ? 'هیپوسالیواسیون — جریان بزاق کاهش‌یافته' : 'Hyposalivation — reduced salivary flow'}</span>
+                                    {/* Verdict Text */}
+                                    <div className="flex-1 flex flex-col justify-center text-center sm:text-start">
+                                        <div className="mb-2">
+                                            <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-white/60 backdrop-blur-sm border shadow-sm ${results.finalCat === 'lowRisk' ? 'text-emerald-700 border-emerald-200' :
+                                                    results.finalCat === 'moderateRisk' ? 'text-amber-700 border-amber-200' :
+                                                        results.finalCat === 'highRisk' ? 'text-red-700 border-red-200' :
+                                                            'text-rose-800 border-rose-300'
+                                                }`}>
+                                                {fa ? 'نتیجه ارزیابی ریسک' : 'Risk Assessment Result'}
+                                            </span>
                                         </div>
-                                    )}
+                                        <h2 className={`text-4xl sm:text-5xl font-black tracking-tight mb-3 ${results.finalCat === 'lowRisk' ? 'text-emerald-700' :
+                                                results.finalCat === 'moderateRisk' ? 'text-amber-700' :
+                                                    results.finalCat === 'highRisk' ? 'text-red-700' :
+                                                        'text-rose-900'
+                                            }`}>
+                                            {t[results.finalCat]}
+                                        </h2>
+
+                                        {/* Overrides */}
+                                        {(results.dOverride || results.eOverride || results.orthoOverride) && (
+                                            <div className="flex flex-wrap justify-center sm:justify-start gap-2 mb-2 sm:mb-0">
+                                                {results.dOverride && <span className="bg-red-100 text-red-700 border border-red-200 text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5"><AlertCircle className="w-3 h-3" /> {t.diseaseOverride}</span>}
+                                                {results.eOverride && <span className="bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5"><Droplets className="w-3 h-3" /> {t.extremeOverride}</span>}
+                                                {results.orthoOverride && <span className="bg-amber-100 text-amber-700 border border-amber-200 text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5"><AlertCircle className="w-3 h-3" /> {t.orthoOverride}</span>}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Total Score Box */}
+                                    <div className="flex-shrink-0 flex flex-col items-center justify-center bg-white rounded-2xl shadow-sm border border-slate-100 p-5 min-w-[140px] relative overflow-hidden">
+                                        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent opacity-50"></div>
+
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t.totalScore}</span>
+                                        <div className={`text-5xl font-black font-mono tracking-tighter ${results.score > 0 ? 'text-red-500' : results.score < 0 ? 'text-emerald-500' : 'text-slate-800'
+                                            }`} dir="ltr">
+                                            {results.score > 0 ? '+' : ''}{toFa(results.score, lang)}
+                                        </div>
+
+                                        {/* Clean Mini Breakdown */}
+                                        <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-50" dir="ltr">
+                                            <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-red-50 text-red-600 text-[11px] font-bold font-mono shadow-sm">+{toFa(results.dScore, lang)}</span>
+                                            <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 text-amber-600 text-[11px] font-bold font-mono shadow-sm">+{toFa(results.rScore, lang)}</span>
+                                            <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 text-[11px] font-bold font-mono shadow-sm">−{toFa(results.pScore, lang)}</span>
+                                        </div>
+                                    </div>
                                 </div>
+
+                                {/* Salivation Status Banner */}
+                                {results.hasHyposalivation && (
+                                    <div className="bg-rose-100/60 border-t border-rose-200/60 px-6 py-3 flex items-center justify-center sm:justify-start gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-rose-200 flex items-center justify-center flex-shrink-0">
+                                            <Droplets className="w-3 h-3 text-rose-700" />
+                                        </div>
+                                        <span className="text-rose-800 text-[11px] sm:text-xs font-semibold">{fa ? 'هیپوسالیواسیون — جریان بزاق کاهش‌یافته' : 'Hyposalivation — reduced salivary flow'}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
