@@ -1049,7 +1049,7 @@ export default function CambraApp() {
                                 </div>
 
                                 {/* Bouncy Pinch Zoom Area */}
-                                <BouncyPinchZoom src="/images/ICADS.png" alt="ICDAS Reference" />
+                                <BouncyPinchZoom src="/images/icdas.png" alt="ICDAS Reference" />
                             </div>
                             {/* Proximal */}
                             <div className="rounded-2xl border border-slate-200 overflow-hidden">                                <div className="bg-indigo-600 px-4 py-2 flex items-center justify-between">
