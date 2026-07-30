@@ -463,9 +463,13 @@ function PdfModal({ open, onClose, lang, patient, results, config, diseaseInd, r
     const tog = id => setSecs(p => p.map(s => s.id === id ? { ...s, on: !s.on } : s));
     const isOn = id => secs.find(s => s.id === id)?.on;
 
+    // Replace the entire `gen` function inside PdfModal with this:
+
     const gen = () => {
-        const rc = { lowRisk: '#059669', moderateRisk: '#d97706', highRisk: '#dc2626', extremeRisk: '#7f1d1d' };
-        const rb = { lowRisk: '#ecfdf5', moderateRisk: '#fffbeb', highRisk: '#fef2f2', extremeRisk: '#fef2f2' };
+        const rc = { lowRisk: '#059669', moderateRisk: '#d97706', highRisk: '#dc2626', extremeRisk: '#991b1b' };
+        const rb = { lowRisk: '#f0fdf4', moderateRisk: '#fffbeb', highRisk: '#fef2f2', extremeRisk: '#fef2f2' };
+        const rg = { lowRisk: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', moderateRisk: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', highRisk: 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)', extremeRisk: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' };
+        const isExtreme = results?.finalCat === 'extremeRisk';
         const catL = t?.[results?.finalCat] || '';
         const dateD = (() => { if (!patient.date) return ''; const [y, m, d] = patient.date.split('-').map(Number); return fa ? `${toFa(d, 'fa')} ${JM[m - 1]} ${toFa(y, 'fa')}` : `${GM[m - 1]} ${d}, ${y}`; })();
         const rl = (arr, pfx) => arr.map((v, i) => v ? t?.[`${pfx}_${i + 1}`] : null).filter(Boolean);
@@ -473,132 +477,647 @@ function PdfModal({ open, onClose, lang, patient, results, config, diseaseInd, r
 
         let body = '';
 
-        if (isOn('patient')) body += `<section><h2>Patient Information</h2><div class="g2"><div class="gi"><div class="gl">${t?.patientName}</div><div class="gv">${patient.name || '—'}</div></div><div class="gi"><div class="gl">${t?.chartNo}</div><div class="gv mono">${patient.chartNo || '—'}</div></div><div class="gi"><div class="gl">${t?.date}</div><div class="gv">${dateD}</div></div><div class="gi"><div class="gl">${t?.assessmentType}</div><div class="gv">${patient.assessmentType === 'baseline' ? t?.baseline : t?.recall}</div></div></div></section>`;
+        // ── Patient Info ──
+        if (isOn('patient')) body += `
+    <section>
+        <div class="sec-head">
+            <div class="sec-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <h2>${fa ? 'اطلاعات بیمار' : 'Patient Information'}</h2>
+        </div>
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="info-label">${t?.patientName}</div>
+                <div class="info-value">${patient.name || '—'}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">${t?.chartNo}</div>
+                <div class="info-value mono">${patient.chartNo || '—'}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">${t?.date}</div>
+                <div class="info-value">${dateD}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">${t?.assessmentType}</div>
+                <div class="info-value">${patient.assessmentType === 'baseline' ? t?.baseline : t?.recall}</div>
+            </div>
+        </div>
+    </section>`;
 
-        const makeList = (arr, pfx, title, cls) => { const items = rl(arr, pfx); body += `<section><h2>${title}</h2>`; if (items.length) body += `<ul class="fl ${cls}">${items.map(i => `<li>${i}</li>`).join('')}</ul>`; else body += `<p class="empty">${fa ? 'موردی نیست' : 'None'}</p>`; body += `</section>`; };
-        if (isOn('disease')) makeList(diseaseInd, 'di', fa ? 'شاخص‌های بیماری' : 'Disease Indicators', 'red');
-        if (isOn('risk')) makeList(riskFact, 'rf', fa ? 'عوامل خطر' : 'Risk Factors', 'amber');
-        if (isOn('protect')) makeList(protFact, 'pf', fa ? 'عوامل محافظتی' : 'Protective Factors', 'green');
+        // ── Factor Lists ──
+        const makeFactorSection = (arr, pfx, title, dotColor, bgColor, borderColor, textColor, iconSvg) => {
+            const items = rl(arr, pfx);
+            body += `
+        <section>
+            <div class="sec-head">
+                <div class="sec-icon" style="color:${textColor}">${iconSvg}</div>
+                <h2>${title}</h2>
+                <div class="sec-count" style="background:${bgColor};color:${textColor};border-color:${borderColor}">${items.length}</div>
+            </div>`;
+            if (items.length) {
+                body += `<div class="factor-list">`;
+                items.forEach(item => {
+                    body += `
+                <div class="factor-item" style="border-color:${borderColor}">
+                    <div class="factor-dot" style="background:${dotColor}"></div>
+                    <span>${item}</span>
+                </div>`;
+                });
+                body += `</div>`;
+            } else {
+                body += `<div class="empty-state">
+                <span>${fa ? 'موردی انتخاب نشده' : 'None selected'}</span>
+            </div>`;
+            }
+            body += `</section>`;
+        };
 
-        if (isOn('result')) body += `<section class="result" style="background:${rb[results?.finalCat]};border-color:${rc[results?.finalCat]}"><div class="ri"><div><div class="rl">${fa ? 'سطح خطر' : 'Risk Level'}</div><div class="rv" style="color:${rc[results?.finalCat]}">${catL}</div>${results?.dOverride ? `<div class="ro">${fa ? '⚠ ارتقا با شاخص بیماری' : '⚠ Disease override'}</div>` : ''}${results?.eOverride ? `<div class="ro">${fa ? '⚠ ارتقا با خشکی دهان' : '⚠ Hyposalivation override'}</div>` : ''}</div><div class="sb" style="border-color:${rc[results?.finalCat]}"><div class="sn" style="color:${rc[results?.finalCat]}">${results?.score > 0 ? '+' : ''}${results?.score}</div><div class="ss">${fa ? 'نمره خالص' : 'Net Score'}</div><div class="sd"><span class="si r">+${results?.dScore}</span><span class="si a">+${results?.rScore}</span><span class="si g">−${results?.pScore}</span></div></div></div></section>`;
+        const svgDisease = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636-2.87L13.637 3.59a1.914 1.914 0 0 0-3.274 0z"/><path d="M12 17h.01"/></svg>`;
+        const svgRisk = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`;
+        const svgProtect = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`;
 
-        if (isOn('tables')) body += `<section><h2>${fa ? 'جداول مرجع بالینی' : 'Clinical Reference Tables'}</h2><div class="tg"><div><h3>ICDAS — ${fa ? 'طبقه‌بندی ضایعات اکلوزال' : 'Occlusal Lesion Classification'}</h3><table><thead><tr><th>${fa ? 'کد' : 'Code'}</th><th>${fa ? 'معنی' : 'Meaning'}</th><th>${fa ? 'وضعیت' : 'Status'}</th></tr></thead><tbody><tr><td class="tc">0</td><td>${fa ? 'سطح دندان سالم' : 'Sound tooth surface'}</td><td>${fa ? 'بدون پوسیدگی' : 'No caries'}</td></tr><tr><td class="tc">1</td><td>${fa ? 'اولین تغییر قابل مشاهده در مینا (فقط بعد از خشک کردن)' : 'First visible enamel change (after drying)'}</td><td>${fa ? 'دمینرالیزاسیون اولیه' : 'Initial demineralisation'}</td></tr><tr><td class="tc">2</td><td>${fa ? 'ضایعه سفید یا قهوه‌ای واضح، بدون نیاز به خشک کردن' : 'Distinct white/brown lesion without drying'}</td><td>${fa ? 'پوسیدگی اولیه مینا' : 'Early enamel caries'}</td></tr><tr><td class="tc">3</td><td>${fa ? 'شکستگی موضعی مینا (Microcavity)، عاج هنوز دیده نمی‌شود' : 'Localised enamel breakdown, no visible dentin'}</td><td>${fa ? 'هنوز عمدتاً محدود به مینا' : 'Mostly enamel-limited'}</td></tr><tr><td class="tc">4</td><td>${fa ? 'سایه تیره از عاج زیر مینا دیده می‌شود' : 'Dark shadow from underlying dentin'}</td><td>${fa ? 'احتمال درگیری عاج' : 'Probable dentin involvement'}</td></tr><tr><td class="tc">5</td><td>${fa ? 'حفره واضح همراه با نمایان شدن عاج' : 'Distinct cavity with exposed dentin'}</td><td>${fa ? 'پوسیدگی واضح' : 'Obvious caries'}</td></tr><tr><td class="tc">6</td><td>${fa ? 'حفره وسیع با تخریب گسترده عاج' : 'Extensive cavity with wide dentin destruction'}</td><td>${fa ? 'پوسیدگی شدید' : 'Severe caries'}</td></tr></tbody></table><div style="margin-top:16px; text-align:center;"><img src="/images/icdas.png" style="max-width:100%; max-height:180px; object-fit:contain;" alt="ICDAS Reference" /></div></div><div><h3>${fa ? 'درجه‌بندی پوسیدگی پروگزیمال' : 'Proximal Caries Classification'} (C1–C4)</h3><table><thead><tr><th>${fa ? 'کد' : 'Code'}</th><th>${fa ? 'محل ضایعه' : 'Lesion Location'}</th></tr></thead><tbody><tr><td class="tc">C1</td><td>${fa ? 'نیمه خارجی مینا' : 'Outer half of enamel'}</td></tr><tr><td class="tc">C2</td><td>${fa ? 'نیمه داخلی مینا' : 'Inner half of enamel'}</td></tr><tr><td class="tc">C3</td><td>${fa ? 'یک‌سوم خارجی عاج' : 'Outer third of dentin'}</td></tr><tr><td class="tc">C4</td><td>${fa ? 'یک‌سوم میانی یا داخلی عاج' : 'Middle or inner third of dentin'}</td></tr></tbody></table></div></div></section>`;
+        if (isOn('disease')) makeFactorSection(dInd, 'di', fa ? 'شاخص‌های بیماری' : 'Disease Indicators', '#ef4444', '#fef2f2', '#fecaca', '#dc2626', svgDisease);
+        if (isOn('risk')) makeFactorSection(riskFact, 'rf', fa ? 'عوامل خطر' : 'Risk Factors', '#f59e0b', '#fffbeb', '#fde68a', '#d97706', svgRisk);
+        if (isOn('protect')) makeFactorSection(protFact, 'pf', fa ? 'عوامل محافظتی' : 'Protective Factors', '#22c55e', '#f0fdf4', '#bbf7d0', '#059669', svgProtect);
 
-        if (isOn('plan')) body += `<section><h2>${fa ? 'برنامه درمانی' : 'Action Plan'}</h2><div class="pg"><div class="pc"><h3>${t?.recDiagnostics}</h3><div class="px">${t?.[RM[results?.finalCat]?.d] || ''}</div></div><div class="pc dark"><h3>${t?.recInterventions}</h3><div class="px">${t?.[RM[results?.finalCat]?.i] || ''}</div></div></div></section>`;
+        // ── Result Verdict ──
+        if (isOn('result')) body += `
+    <section class="verdict-section">
+        <div class="verdict-card" style="background:${rg[results?.finalCat]};border-color:${isExtreme ? '#334155' : rc[results?.finalCat]}">
+            <div class="verdict-main">
+                <div class="verdict-left">
+                    <div class="verdict-eyebrow" style="color:${isExtreme ? '#94a3b8' : rc[results?.finalCat]}">${fa ? 'نتیجه ارزیابی ریسک' : 'RISK ASSESSMENT RESULT'}</div>
+                    <div class="verdict-title" style="color:${isExtreme ? '#ffffff' : rc[results?.finalCat]}">${catL}</div>
+                    ${results?.dOverride ? `<div class="verdict-override" style="background:${isExtreme ? 'rgba(255,255,255,0.08)' : 'rgba(220,38,38,0.08)'};color:${isExtreme ? '#fca5a5' : '#dc2626'}">⚠ ${t?.diseaseOverride || (fa ? 'ارتقا با شاخص بیماری' : 'Disease indicator override')}</div>` : ''}
+                    ${results?.eOverride ? `<div class="verdict-override" style="background:${isExtreme ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.08)'};color:${isExtreme ? '#fcd34d' : '#d97706'}">⚠ ${t?.extremeOverride || (fa ? 'ارتقا با هیپوسالیواسیون' : 'Hyposalivation override')}</div>` : ''}
+                    ${results?.orthoOverride ? `<div class="verdict-override" style="background:${isExtreme ? 'rgba(255,255,255,0.08)' : 'rgba(100,116,139,0.08)'};color:${isExtreme ? '#cbd5e1' : '#475569'}">⚠ ${t?.orthoOverride || (fa ? 'ارتقا ارتودنسی' : 'Orthodontic override')}</div>` : ''}
+                </div>
+                <div class="verdict-score-box" style="border-color:${isExtreme ? '#475569' : rc[results?.finalCat]}">
+                    <div class="verdict-score-num" style="color:${isExtreme ? '#f1f5f9' : rc[results?.finalCat]}">${results?.score > 0 ? '+' : ''}${results?.score}</div>
+                    <div class="verdict-score-label" style="color:${isExtreme ? '#64748b' : '#94a3b8'}">${fa ? 'نمره خالص' : 'NET SCORE'}</div>
+                    <div class="verdict-chips">
+                        <span class="vchip vchip-r">+${results?.dScore}</span>
+                        <span class="vchip vchip-a">+${results?.rScore}</span>
+                        <span class="vchip vchip-g">−${results?.pScore}</span>
+                    </div>
+                </div>
+            </div>
+            ${results?.hasHyposalivation ? `
+            <div class="hypo-bar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                <span>${fa ? 'هیپوسالیواسیون — جریان بزاق کاهش‌یافته' : 'Hyposalivation — Reduced salivary flow detected'}</span>
+            </div>` : ''}
+        </div>
+    </section>`;
 
-        const html = `<!DOCTYPE html><html dir="${fa ? 'rtl' : 'ltr'}" lang="${lang}"><head><meta charset="UTF-8"><title>CAMBRA — ${patient.name}</title>
-<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800;900&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+        // ── Reference Tables ──
+        if (isOn('tables')) body += `
+    <section>
+        <div class="sec-head">
+            <div class="sec-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg>
+            </div>
+            <h2>${fa ? 'جداول مرجع بالینی' : 'Clinical Reference Tables'}</h2>
+        </div>
+        <div class="tables-grid">
+            <div class="ref-table">
+                <div class="ref-table-head dark">
+                    <span class="ref-table-title">ICDAS</span>
+                    <span class="ref-table-sub">${fa ? 'طبقه‌بندی ضایعات اکلوزال' : 'Occlusal Lesion Classification'}</span>
+                </div>
+                <table>
+                    <thead><tr><th class="w-code">${fa ? 'کد' : 'Code'}</th><th>${fa ? 'معنی' : 'Meaning'}</th><th>${fa ? 'وضعیت' : 'Status'}</th></tr></thead>
+                    <tbody>
+                        <tr><td class="tc">0</td><td>${fa ? 'سطح دندان سالم' : 'Sound tooth surface'}</td><td class="ts">${fa ? 'بدون پوسیدگی' : 'No caries'}</td></tr>
+                        <tr><td class="tc">1</td><td>${fa ? 'اولین تغییر قابل مشاهده در مینا' : 'First visible enamel change (after drying)'}</td><td class="ts">${fa ? 'دمینرالیزاسیون اولیه' : 'Initial demineralisation'}</td></tr>
+                        <tr><td class="tc">2</td><td>${fa ? 'ضایعه سفید یا قهوه‌ای واضح' : 'Distinct white/brown lesion without drying'}</td><td class="ts">${fa ? 'پوسیدگی اولیه مینا' : 'Early enamel caries'}</td></tr>
+                        <tr><td class="tc">3</td><td>${fa ? 'شکستگی موضعی مینا (Microcavity)' : 'Localised enamel breakdown, no visible dentin'}</td><td class="ts">${fa ? 'محدود به مینا' : 'Mostly enamel-limited'}</td></tr>
+                        <tr><td class="tc">4</td><td>${fa ? 'سایه تیره از عاج زیر مینا' : 'Dark shadow from underlying dentin'}</td><td class="ts">${fa ? 'احتمال درگیری عاج' : 'Probable dentin involvement'}</td></tr>
+                        <tr><td class="tc">5</td><td>${fa ? 'حفره واضح همراه با نمایان شدن عاج' : 'Distinct cavity with exposed dentin'}</td><td class="ts">${fa ? 'پوسیدگی واضح' : 'Obvious caries'}</td></tr>
+                        <tr><td class="tc">6</td><td>${fa ? 'حفره وسیع با تخریب گسترده عاج' : 'Extensive cavity with wide dentin destruction'}</td><td class="ts">${fa ? 'پوسیدگی شدید' : 'Severe caries'}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="ref-table">
+                <div class="ref-table-head indigo">
+                    <span class="ref-table-title">${fa ? 'پروگزیمال' : 'Proximal'}</span>
+                    <span class="ref-table-sub">${fa ? 'درجه‌بندی پوسیدگی پروگزیمال' : 'Proximal Caries Classification'}</span>
+                </div>
+                <table>
+                    <thead><tr><th class="w-code">${fa ? 'کد' : 'Code'}</th><th>${fa ? 'محل ضایعه' : 'Lesion Location'}</th></tr></thead>
+                    <tbody>
+                        <tr><td class="tc accent">C1</td><td>${fa ? 'نیمه خارجی مینا' : 'Outer half of enamel'}</td></tr>
+                        <tr><td class="tc accent">C2</td><td>${fa ? 'نیمه داخلی مینا' : 'Inner half of enamel'}</td></tr>
+                        <tr><td class="tc accent">C3</td><td>${fa ? 'یک‌سوم خارجی عاج' : 'Outer third of dentin'}</td></tr>
+                        <tr><td class="tc accent">C4</td><td>${fa ? 'یک‌سوم میانی یا داخلی عاج' : 'Middle or inner third of dentin'}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>`;
+
+        // ── Action Plan ──
+        if (isOn('plan')) body += `
+    <section>
+        <div class="sec-head">
+            <div class="sec-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/><path d="m9 14 2 2 4-4"/></svg>
+            </div>
+            <h2>${fa ? 'برنامه درمانی' : 'Action Plan'}</h2>
+            <div class="plan-badge" style="background:${rb[results?.finalCat]};color:${rc[results?.finalCat]};border-color:${rc[results?.finalCat]}">${catL}</div>
+        </div>
+        <div class="plan-grid">
+            <div class="plan-card">
+                <div class="plan-card-head light">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+                    <span>${t?.recDiagnostics}</span>
+                </div>
+                <div class="plan-card-body">${t?.[RM[results?.finalCat]?.d] || ''}</div>
+            </div>
+            <div class="plan-card dark">
+                <div class="plan-card-head dark">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    <span>${t?.recInterventions}</span>
+                </div>
+                <div class="plan-card-body">${t?.[RM[results?.finalCat]?.i] || ''}</div>
+            </div>
+        </div>
+    </section>`;
+
+        // ── Full HTML Document ──
+        const html = `<!DOCTYPE html>
+<html dir="${fa ? 'rtl' : 'ltr'}" lang="${lang}">
+<head>
+<meta charset="UTF-8">
+<title>CAMBRA — ${patient.name}</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+/* ═══ Reset & Base ═══ */
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Vazirmatn',sans-serif;color:#1e293b;font-size:12px;line-height:1.8;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-@page{size:A4;margin:0 14mm}
+body{
+    font-family:'Vazirmatn','Inter',system-ui,sans-serif;
+    color:#1e293b;
+    font-size:11px;
+    line-height:1.7;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+}
+@page{size:A4;margin:12mm 14mm}
 
-/* Repeating vertical page margins */
-.pw{width:100%;border-collapse:collapse}
-.pw thead{display:table-header-group}
-.pw tfoot{display:table-footer-group}
-.pw>thead td,.pw>tbody>tr>td,.pw>tfoot td{padding:0;border:none}
-.pw-top{height:16mm}
-.pw-bot{height:14mm}
+/* ═══ Page Structure ═══ */
+.page{
+    max-width:182mm;
+    margin:0 auto;
+    padding:0;
+}
 
-/* Header */
-.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:20px;border-bottom:3px solid #0f172a;margin-bottom:32px}
-.hdr-l{display:flex;align-items:center;gap:14px}
-.logo{width:44px;height:44px;background:#0f172a;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Amiri',serif;font-weight:700;font-size:22px}
-.hdr-l h1{font-size:28px;font-weight:900;letter-spacing:-1.5px;line-height:1}
-.hdr-l p{font-size:8px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;margin-top:3px}
-.hdr-r{text-align:${fa ? 'left' : 'right'}}
-.hdr-r .date{font-size:10px;color:#64748b;font-weight:600}
-.badge{display:inline-block;padding:5px 16px;border-radius:8px;color:#fff;font-weight:800;font-size:14px;margin-top:6px}
-.hdr-r .name{font-size:11px;font-weight:700;color:#475569;margin-top:4px}
+/* ═══ Header ═══ */
+.header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    padding-bottom:16px;
+    margin-bottom:24px;
+    border-bottom:2.5px solid #0f172a;
+}
+.header-left{display:flex;align-items:center;gap:12px}
+.logo-mark{
+    width:40px;height:40px;
+    background:#0f172a;
+    border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:900;font-size:20px;
+    letter-spacing:-1px;
+    font-family:'Inter','Vazirmatn',sans-serif;
+}
+.header-left h1{
+    font-size:24px;font-weight:900;
+    letter-spacing:-1.5px;line-height:1;
+    color:#0f172a;
+    font-family:'Inter','Vazirmatn',sans-serif;
+}
+.header-left .protocol{
+    font-size:7px;font-weight:700;
+    letter-spacing:3px;text-transform:uppercase;
+    color:#94a3b8;margin-top:3px;
+}
+.header-right{text-align:${fa ? 'left' : 'right'}}
+.header-right .date{font-size:9px;color:#94a3b8;font-weight:600}
+.header-right .patient-name{font-size:10px;font-weight:700;color:#334155;margin-top:2px}
+.risk-badge{
+    display:inline-block;
+    padding:4px 16px;
+    border-radius:8px;
+    color:#fff;
+    font-weight:800;
+    font-size:12px;
+    margin-top:6px;
+    letter-spacing:0.5px;
+}
 
-/* Sections */
-section{margin-bottom:24px;break-inside:avoid;page-break-inside:avoid;position:relative}
-h2{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2.5px;color:#64748b;border-bottom:1.5px solid #e2e8f0;padding-bottom:6px;margin-bottom:12px}
-h3{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#475569;margin-bottom:8px}
+/* ═══ Section Heads ═══ */
+.sec-head{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:12px;
+    padding-bottom:8px;
+    border-bottom:1.5px solid #f1f5f9;
+}
+.sec-icon{
+    width:22px;height:22px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:6px;
+    display:flex;align-items:center;justify-content:center;
+    color:#64748b;
+    flex-shrink:0;
+}
+.sec-head h2{
+    font-size:9px;font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:2.5px;
+    color:#475569;
+    flex:1;
+}
+.sec-count{
+    font-size:9px;font-weight:800;
+    padding:2px 8px;
+    border-radius:6px;
+    border:1px solid;
+    font-family:'Inter',monospace;
+}
+section{
+    margin-bottom:20px;
+    break-inside:avoid;
+    page-break-inside:avoid;
+}
 
-/* Info grid */
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.gi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:7px 10px}
-.gl{font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px}
-.gv{font-size:12px;font-weight:700;color:#0f172a;margin-top:1px}
-.mono{font-family:ui-monospace,monospace}
+/* ═══ Patient Info Grid ═══ */
+.info-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+}
+.info-card{
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    padding:8px 12px;
+}
+.info-label{
+    font-size:8px;font-weight:700;
+    color:#94a3b8;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+}
+.info-value{
+    font-size:12px;font-weight:700;
+    color:#0f172a;margin-top:2px;
+}
+.mono{font-family:'Inter',ui-monospace,monospace;letter-spacing:0.5px}
 
-/* Fact lists */
-.fl{list-style:none;display:flex;flex-direction:column;gap:4px}
-.fl li{display:flex;align-items:flex-start;gap:7px;font-size:11px;font-weight:500;padding:4px 8px;border-radius:5px}
-.fl li::before{content:'';width:5px;height:5px;border-radius:50%;margin-top:5px;flex-shrink:0}
-.fl.red li{background:#fff1f2;color:#881337}.fl.red li::before{background:#ef4444}
-.fl.amber li{background:#fffbeb;color:#78350f}.fl.amber li::before{background:#f59e0b}
-.fl.green li{background:#f0fdf4;color:#14532d}.fl.green li::before{background:#22c55e}
-.empty{font-size:11px;color:#94a3b8;font-style:italic}
+/* ═══ Factor Lists ═══ */
+.factor-list{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
+.factor-item{
+    display:flex;
+    align-items:flex-start;
+    gap:8px;
+    font-size:10.5px;
+    font-weight:500;
+    padding:6px 10px;
+    border-radius:6px;
+    border-${fa ? 'right' : 'left'}:3px solid;
+    background:#fafafa;
+    line-height:1.6;
+}
+.factor-dot{
+    width:5px;height:5px;
+    border-radius:50%;
+    margin-top:5px;
+    flex-shrink:0;
+}
+.empty-state{
+    padding:12px;
+    text-align:center;
+    color:#cbd5e1;
+    font-size:10px;
+    font-style:italic;
+    background:#fafafa;
+    border-radius:8px;
+    border:1px dashed #e2e8f0;
+}
 
-/* Result */
-.result{border:2px solid;border-radius:10px;padding:16px 20px}
-.ri{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
-.rl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#64748b}
-.rv{font-size:30px;font-weight:900;letter-spacing:-1px;line-height:1;margin-top:4px}
-.ro{font-size:9px;font-weight:600;color:#dc2626;margin-top:4px;padding:2px 6px;background:rgba(220,38,38,.08);border-radius:4px;display:inline-block}
-.sb{border:2px solid;border-radius:8px;padding:10px 16px;text-align:center;min-width:110px;background:rgba(255,255,255,.7)}
-.sn{font-size:38px;font-weight:900;font-family:ui-monospace,monospace;line-height:1}
-.ss{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:#64748b;margin-top:2px}
-.sd{display:flex;gap:4px;justify-content:center;margin-top:6px}
-.si{font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px}
-.si.r{background:#fee2e2;color:#dc2626}.si.a{background:#fef3c7;color:#d97706}.si.g{background:#d1fae5;color:#059669}
+/* ═══ Verdict Card ═══ */
+.verdict-section{margin-bottom:20px}
+.verdict-card{
+    border:2px solid;
+    border-radius:12px;
+    overflow:hidden;
+}
+.verdict-main{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    padding:20px 24px;
+    flex-wrap:wrap;
+}
+.verdict-left{flex:1;min-width:200px}
+.verdict-eyebrow{
+    font-size:8px;font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:3px;
+    margin-bottom:4px;
+}
+.verdict-title{
+    font-size:32px;font-weight:900;
+    letter-spacing:-1px;
+    line-height:1.1;
+}
+.verdict-override{
+    display:inline-block;
+    font-size:8px;font-weight:700;
+    padding:3px 8px;
+    border-radius:5px;
+    margin-top:6px;
+    margin-${fa ? 'left' : 'right'}:4px;
+}
+.verdict-score-box{
+    border:2px solid;
+    border-radius:10px;
+    padding:12px 20px;
+    text-align:center;
+    min-width:100px;
+    background:rgba(255,255,255,0.85);
+    backdrop-filter:blur(8px);
+}
+.verdict-score-num{
+    font-size:40px;font-weight:900;
+    font-family:'Inter',ui-monospace,monospace;
+    line-height:1;
+    letter-spacing:-2px;
+}
+.verdict-score-label{
+    font-size:7px;font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:3px;
+    margin-top:3px;
+}
+.verdict-chips{
+    display:flex;gap:3px;
+    justify-content:center;
+    margin-top:8px;
+}
+.vchip{
+    font-size:8px;font-weight:800;
+    padding:2px 6px;
+    border-radius:4px;
+    font-family:'Inter',ui-monospace,monospace;
+}
+.vchip-r{background:#fee2e2;color:#dc2626}
+.vchip-a{background:#fef3c7;color:#d97706}
+.vchip-g{background:#d1fae5;color:#059669}
 
-/* Tables */
-.tg{display:grid;grid-template-columns:2fr 1fr;gap:20px}
+.hypo-bar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 24px;
+    background:#0f172a;
+    color:#f8fafc;
+    font-size:10px;
+    font-weight:600;
+    border-top:1px solid #1e293b;
+}
+
+/* ═══ Reference Tables ═══ */
+.tables-grid{
+    display:grid;
+    grid-template-columns:1.8fr 1fr;
+    gap:14px;
+}
+.ref-table{
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    overflow:hidden;
+    break-inside:avoid;
+}
+.ref-table-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:6px 12px;
+}
+.ref-table-head.dark{background:#0f172a}
+.ref-table-head.indigo{background:#4f46e5}
+.ref-table-title{
+    color:#fff;font-size:10px;
+    font-weight:800;letter-spacing:1px;
+}
+.ref-table-sub{
+    font-size:7px;font-weight:600;
+    letter-spacing:1px;text-transform:uppercase;
+}
+.ref-table-head.dark .ref-table-sub{color:#64748b}
+.ref-table-head.indigo .ref-table-sub{color:#c7d2fe}
+
 table{width:100%;border-collapse:collapse;font-size:10px}
-th,td{border:1px solid #e2e8f0;padding:4px 8px;text-align:${fa ? 'right' : 'left'}}
-th{background:#f1f5f9;font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#475569}
-.tc{text-align:center;font-weight:800;font-family:ui-monospace,monospace;background:#f8fafc}
+th{
+    background:#f8fafc;
+    font-weight:700;font-size:8px;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:#64748b;
+    padding:5px 8px;
+    text-align:${fa ? 'right' : 'left'};
+    border-bottom:1.5px solid #e2e8f0;
+}
+td{
+    padding:5px 8px;
+    border-bottom:1px solid #f1f5f9;
+    text-align:${fa ? 'right' : 'left'};
+    font-size:10px;
+    color:#334155;
+}
+.w-code{width:36px}
+.tc{
+    text-align:center;
+    font-weight:800;
+    font-family:'Inter',ui-monospace,monospace;
+    color:#0f172a;
+    background:#fafafa;
+}
+.tc.accent{
+    color:#4f46e5;
+}
+.ts{
+    font-size:9px;
+    color:#64748b;
+}
 
-/* Plan */
-.pg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.pc{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;break-inside:avoid}
-.pc h3{margin:0;padding:8px 12px;background:#f8fafc;border-bottom:1px solid #e2e8f0}
-.pc.dark h3{background:#0f172a;color:#e2e8f0;border:none}
-.px{padding:10px 12px;font-size:11px;line-height:1.8}
-.px ul{list-style:none;display:flex;flex-direction:column;gap:5px}
-.px li{padding:4px 8px;border-radius:5px;background:#f8fafc;border:1px solid #f1f5f9}
+/* ═══ Action Plan ═══ */
+.plan-badge{
+    font-size:8px;font-weight:800;
+    padding:2px 10px;
+    border-radius:6px;
+    border:1px solid;
+    letter-spacing:0.5px;
+}
+.plan-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+.plan-card{
+    border:1px solid #e2e8f0;
+    border-radius:8px;
+    overflow:hidden;
+    break-inside:avoid;
+}
+.plan-card.dark{
+    border:2px solid #0f172a;
+}
+.plan-card-head{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 12px;
+    font-size:8px;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:2px;
+}
+.plan-card-head.light{
+    background:#f8fafc;
+    border-bottom:1px solid #e2e8f0;
+    color:#475569;
+}
+.plan-card-head.dark{
+    background:#0f172a;
+    color:#a5b4fc;
+}
+.plan-card-body{
+    padding:10px 12px;
+    font-size:10px;
+    line-height:1.8;
+    color:#334155;
+}
+.plan-card-body ul{
+    list-style:none;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    padding:0;margin:0;
+}
+.plan-card-body li{
+    padding:4px 8px;
+    border-radius:5px;
+    background:#f8fafc;
+    border:1px solid #f1f5f9;
+    font-size:10px;
+    line-height:1.6;
+}
+.plan-card.dark .plan-card-body li{
+    background:#f8fafc;
+    border-color:#e2e8f0;
+}
 
-/* Footer */
-.ftr{margin-top:36px;padding-top:10px;border-top:1.5px solid #e2e8f0;display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;font-weight:600}
-.ftr b{color:#475569;letter-spacing:2px;text-transform:uppercase}
+/* ═══ Footer ═══ */
+.footer{
+    margin-top:28px;
+    padding-top:10px;
+    border-top:2px solid #0f172a;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:8px;
+    color:#94a3b8;
+    font-weight:600;
+}
+.footer-brand{
+    font-size:9px;
+    font-weight:900;
+    color:#0f172a;
+    letter-spacing:2px;
+    font-family:'Inter','Vazirmatn',sans-serif;
+}
+.footer-dots{
+    display:flex;gap:3px;
+}
+.footer-dots span{
+    width:4px;height:4px;
+    border-radius:50%;
+    background:#cbd5e1;
+}
 
-@media print{section{break-inside:avoid}.pg>div,.tg>div{break-inside:avoid}}
+/* ═══ Screen Preview ═══ */
 @media screen{
-  html{background:#64748b}
-  body{background:#64748b;padding:0}
-  .pw{display:block;width:210mm;margin:0 auto}
-  .pw thead,.pw tfoot{display:none}
-  .page{background:#fff;width:210mm;min-height:297mm;padding:18mm 16mm;margin:24px auto;box-shadow:0 4px 32px rgba(0,0,0,.3),0 0 0 1px rgba(0,0,0,.08);position:relative}
-  .page+.page::before{content:'';display:block;position:absolute;top:-24px;left:0;right:0;height:24px;background:#64748b}
-}
-@media print{
-  .pw>thead td,.pw>tbody td,.pw>tfoot td{padding-left:0;padding-right:0}
-}
-/* Hide scrollbars for horizontal tab rows */
-.hide-scroll::-webkit-scrollbar { display: none; }
-.hide-scroll { -ms-overflow-style: none; scrollbar-width: none; scroll-behavior: smooth; }
-
-/* Prevent iOS auto-zoom on inputs while keeping accessible pinch-to-zoom */
-@media screen and (max-width: 768px) {
-    input[type="text"], input[type="number"], input[type="tel"], select, textarea {
-        font-size: 16px !important;
+    html{background:#64748b}
+    body{background:#64748b;padding:20px 0}
+    .page{
+        background:#fff;
+        width:210mm;
+        min-height:297mm;
+        padding:18mm 16mm;
+        margin:0 auto;
+        box-shadow:0 8px 40px rgba(0,0,0,.25),0 0 0 1px rgba(0,0,0,.06);
+        border-radius:4px;
     }
 }
-    
-</style></head><body>
-<table class="pw"><thead><tr><td><div class="pw-top"></div></td></tr></thead><tbody><tr><td>
-<div class="page"><div class="hdr"><div class="hdr-l"><div class="logo">C</div><div><h1>CAMBRA</h1><p>${fa ? 'گزارش ارزیابی ریسک پوسیدگی' : 'Caries Risk Assessment Report'}</p></div></div><div class="hdr-r"><div class="date">${dateD}</div><div class="badge" style="background:${rc[results?.finalCat]}">${catL}</div>${patient.name ? `<div class="name">${patient.name}</div>` : ''}</div></div>
-${body}
-<div class="ftr"><b>CAMBRA</b><span>${fa ? 'ابزار بالینی ارزیابی ریسک پوسیدگی' : 'Clinical Caries Risk Assessment Tool'}</span><span>${dateD}</span></div>
-</div></td></tr></tbody><tfoot><tr><td><div class="pw-bot"></div></td></tr></tfoot></table></body></html>`;
+@media print{
+    body{padding:0;background:#fff}
+    .page{padding:0;box-shadow:none;min-height:auto}
+    section{break-inside:avoid}
+    .plan-grid>div,.tables-grid>div{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="logo-mark">C</div>
+            <div>
+                <h1>CAMBRA</h1>
+                <div class="protocol">${fa ? 'گزارش ارزیابی ریسک پوسیدگی' : 'Caries Risk Assessment Report'}</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="date">${dateD}</div>
+            ${patient.name ? `<div class="patient-name">${patient.name}</div>` : ''}
+            <div class="risk-badge" style="background:${rc[results?.finalCat]}">${catL}</div>
+        </div>
+    </div>
+
+    <!-- Content -->
+    ${body}
+
+    <!-- Footer -->
+    <div class="footer">
+        <span class="footer-brand">CAMBRA</span>
+        <div class="footer-dots"><span></span><span></span><span></span></div>
+        <span>${fa ? 'ابزار بالینی ارزیابی ریسک پوسیدگی' : 'Clinical Caries Risk Assessment Tool'}</span>
+        <span>${dateD}</span>
+    </div>
+
+</div>
+</body>
+</html>`;
 
         const w = window.open('', '_blank', 'width=1000,height=1100');
-        w.document.write(html); w.document.close();
-        setTimeout(() => w.print(), 500); onClose();
+        w.document.write(html);
+        w.document.close();
+        setTimeout(() => w.print(), 600);
+        onClose();
     };
 
     if (!open) return null;
@@ -826,7 +1345,7 @@ export default function CambraApp() {
             )}
 
             {/* MAIN - Scrollable Content Area Only */}
-                <main ref={mainScrollRef} className="flex-1 overflow-y-auto px-4 md:px-6 py-6 pb-28" style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}>
+            <main ref={mainScrollRef} className="flex-1 overflow-y-auto px-4 md:px-6 py-6 pb-28" style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}>
                 <div className="max-w-2xl mx-auto">
                     {isW && <Welcome lang={lang} onStart={() => setTab('patient')} />}
 
@@ -931,143 +1450,131 @@ export default function CambraApp() {
 
                         {/* RESULTS */}
                         <div className={`${tab !== 'results' ? 'hidden' : ''} space-y-5 pb-12`}>
-{/* ── Verdict banner ── */}
-<div className="c-fade-up">
-    <div className="relative rounded-2xl border-2 border-slate-900 overflow-hidden shadow-[4px_4px_0_#0f172a]">
-        
-        {/* Background — subtle gradient instead of harsh solid */}
-        <div className={`absolute inset-0 ${
-            results.finalCat === 'lowRisk' ? 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50' :
-            results.finalCat === 'moderateRisk' ? 'bg-gradient-to-br from-amber-50 via-white to-orange-50' :
-            results.finalCat === 'highRisk' ? 'bg-gradient-to-br from-red-50 via-white to-rose-50' :
-            'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
-        }`} />
+                            {/* ── Verdict banner ── */}
+                            <div className="c-fade-up">
+                                <div className="relative rounded-2xl border-2 border-slate-900 overflow-hidden shadow-[4px_4px_0_#0f172a]">
 
-        {/* Decorative corner accent */}
-        <div className={`absolute top-0 ${fa ? 'left-0' : 'right-0'} w-32 h-32 rounded-full blur-3xl opacity-20 ${
-            results.finalCat === 'lowRisk' ? 'bg-emerald-400' :
-            results.finalCat === 'moderateRisk' ? 'bg-amber-400' :
-            results.finalCat === 'highRisk' ? 'bg-red-400' :
-            'bg-red-600'
-        }`} />
+                                    {/* Background — subtle gradient instead of harsh solid */}
+                                    <div className={`absolute inset-0 ${results.finalCat === 'lowRisk' ? 'bg-gradient-to-br from-emerald-50 via-white to-emerald-50' :
+                                            results.finalCat === 'moderateRisk' ? 'bg-gradient-to-br from-amber-50 via-white to-orange-50' :
+                                                results.finalCat === 'highRisk' ? 'bg-gradient-to-br from-red-50 via-white to-rose-50' :
+                                                    'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
+                                        }`} />
 
-        <div className="relative flex flex-col sm:flex-row items-center sm:items-stretch">
-            
-            {/* Mascot */}
-            <div className={`w-full sm:w-5/12 p-6 sm:p-8 flex items-center justify-center ${
-                results.finalCat === 'extremeRisk' ? 'bg-white/5' : 'bg-slate-900/[0.03]'
-            }`}>
-                <CImg 
-                    name={OUTCOME_IMAGES[results.finalCat]} 
-                    alt="" 
-                    className="w-36 sm:w-full max-w-[160px] drop-shadow-lg c-pop" 
-                />
-            </div>
+                                    {/* Decorative corner accent */}
+                                    <div className={`absolute top-0 ${fa ? 'left-0' : 'right-0'} w-32 h-32 rounded-full blur-3xl opacity-20 ${results.finalCat === 'lowRisk' ? 'bg-emerald-400' :
+                                            results.finalCat === 'moderateRisk' ? 'bg-amber-400' :
+                                                results.finalCat === 'highRisk' ? 'bg-red-400' :
+                                                    'bg-red-600'
+                                        }`} />
 
-            {/* Content */}
-            <div className="w-full sm:w-7/12 p-5 sm:p-6 flex flex-col justify-center gap-4">
-                
-                {/* Risk Level Label */}
-                <div>
-                    <span className={`text-[9px] font-bold uppercase tracking-[.2em] ${
-                        results.finalCat === 'extremeRisk' ? 'text-red-300' : 'text-slate-400'
-                    }`}>
-                        {fa ? 'نتیجه ارزیابی ریسک' : 'Risk Assessment Result'}
-                    </span>
-                    
-                    <h2 className={`text-3xl sm:text-4xl font-black tracking-tight leading-none mt-1.5 ${
-                        results.finalCat === 'lowRisk' ? 'text-emerald-700' :
-                        results.finalCat === 'moderateRisk' ? 'text-amber-700' :
-                        results.finalCat === 'highRisk' ? 'text-red-700' :
-                        'text-white'
-                    }`}>
-                        {t[results.finalCat]}
-                    </h2>
+                                    <div className="relative flex flex-col sm:flex-row items-center sm:items-stretch">
 
-                    {/* Override pills */}
-                    {(results.dOverride || results.eOverride || results.orthoOverride) && (
-                        <div className="flex flex-wrap gap-1.5 mt-3">
-                            {results.dOverride && (
-                                <span className={`text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${
-                                    results.finalCat === 'extremeRisk' 
-                                        ? 'bg-white/10 text-red-200 border border-white/10' 
-                                        : 'bg-red-100 text-red-700 border border-red-200'
-                                }`}>
-                                    <AlertCircle className="w-3 h-3" /> {t.diseaseOverride}
-                                </span>
-                            )}
-                            {results.eOverride && (
-                                <span className={`text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${
-                                    results.finalCat === 'extremeRisk' 
-                                        ? 'bg-white/10 text-amber-200 border border-white/10' 
-                                        : 'bg-amber-100 text-amber-700 border border-amber-200'
-                                }`}>
-                                    <Droplets className="w-3 h-3" /> {t.extremeOverride}
-                                </span>
-                            )}
-                            {results.orthoOverride && (
-                                <span className={`text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${
-                                    results.finalCat === 'extremeRisk' 
-                                        ? 'bg-white/10 text-slate-200 border border-white/10' 
-                                        : 'bg-slate-100 text-slate-700 border border-slate-200'
-                                }`}>
-                                    <AlertCircle className="w-3 h-3" /> {t.orthoOverride}
-                                </span>
-                            )}
-                        </div>
-                    )}
-                </div>
+                                        {/* Mascot */}
+                                        <div className={`w-full sm:w-5/12 p-6 sm:p-8 flex items-center justify-center ${results.finalCat === 'extremeRisk' ? 'bg-white/5' : 'bg-slate-900/[0.03]'
+                                            }`}>
+                                            <CImg
+                                                name={OUTCOME_IMAGES[results.finalCat]}
+                                                alt=""
+                                                className="w-36 sm:w-full max-w-[160px] drop-shadow-lg c-pop"
+                                            />
+                                        </div>
 
-                {/* Score chip + breakdown — unified row */}
-                <div className={`flex items-center gap-3 pt-4 mt-auto ${
-                    results.finalCat === 'extremeRisk' ? 'border-t border-white/10' : 'border-t border-slate-200/60'
-                }`}>
-                    {/* Net score */}
-                    <div className={`flex-shrink-0 px-4 py-2.5 rounded-xl border-2 text-center min-w-[72px] ${
-                        results.finalCat === 'extremeRisk' 
-                            ? 'border-white/20 bg-white/5' 
-                            : 'border-slate-900 bg-white shadow-[2px_2px_0_#0f172a]'
-                    }`}>
-                        <div className={`text-2xl font-black font-mono leading-none ${
-                            results.finalCat === 'extremeRisk' ? 'text-white' : 'text-slate-900'
-                        }`} dir="ltr">
-                            {results.score > 0 ? '+' : ''}{toFa(results.score, lang)}
-                        </div>
-                        <span className={`text-[8px] font-bold uppercase tracking-widest ${
-                            results.finalCat === 'extremeRisk' ? 'text-white/50' : 'text-slate-400'
-                        }`}>{t.totalScore}</span>
-                    </div>
+                                        {/* Content */}
+                                        <div className="w-full sm:w-7/12 p-5 sm:p-6 flex flex-col justify-center gap-4">
 
-                    {/* Breakdown chips */}
-                    <div className="flex flex-wrap gap-1.5" dir="ltr">
-                        <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500 text-white text-[11px] font-bold font-mono shadow-sm">
-                            <Stethoscope className="w-3 h-3 opacity-70" />+{toFa(results.dScore, lang)}
-                        </span>
-                        <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-400 text-slate-900 text-[11px] font-bold font-mono shadow-sm">
-                            <Zap className="w-3 h-3 opacity-70" />+{toFa(results.rScore, lang)}
-                        </span>
-                        <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white text-[11px] font-bold font-mono shadow-sm">
-                            <ShieldCheck className="w-3 h-3 opacity-70" />−{toFa(results.pScore, lang)}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                                            {/* Risk Level Label */}
+                                            <div>
+                                                <span className={`text-[9px] font-bold uppercase tracking-[.2em] ${results.finalCat === 'extremeRisk' ? 'text-red-300' : 'text-slate-400'
+                                                    }`}>
+                                                    {fa ? 'نتیجه ارزیابی ریسک' : 'Risk Assessment Result'}
+                                                </span>
 
-    {/* Hyposalivation alert */}
-    {results.hasHyposalivation && (
-        <div className="mt-3 bg-gradient-to-r from-slate-900 to-slate-800 text-white border-2 border-slate-900 rounded-xl px-5 py-3 flex items-center gap-3 shadow-[3px_3px_0_#cbd5e1]">
-            <div className="w-8 h-8 rounded-lg bg-amber-400/20 flex items-center justify-center flex-shrink-0">
-                <Droplets className="w-4 h-4 text-amber-400" />
-            </div>
-            <div>
-                <span className="text-xs font-bold block">{fa ? 'هیپوسالیواسیون' : 'Hyposalivation'}</span>
-                <span className="text-[11px] text-slate-400">{fa ? 'جریان بزاق کاهش‌یافته' : 'Reduced salivary flow detected'}</span>
-            </div>
-        </div>
-    )}
-</div>
+                                                <h2 className={`text-3xl sm:text-4xl font-black tracking-tight leading-none mt-1.5 ${results.finalCat === 'lowRisk' ? 'text-emerald-700' :
+                                                        results.finalCat === 'moderateRisk' ? 'text-amber-700' :
+                                                            results.finalCat === 'highRisk' ? 'text-red-700' :
+                                                                'text-white'
+                                                    }`}>
+                                                    {t[results.finalCat]}
+                                                </h2>
+
+                                                {/* Override pills */}
+                                                {(results.dOverride || results.eOverride || results.orthoOverride) && (
+                                                    <div className="flex flex-wrap gap-1.5 mt-3">
+                                                        {results.dOverride && (
+                                                            <span className={`text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${results.finalCat === 'extremeRisk'
+                                                                    ? 'bg-white/10 text-red-200 border border-white/10'
+                                                                    : 'bg-red-100 text-red-700 border border-red-200'
+                                                                }`}>
+                                                                <AlertCircle className="w-3 h-3" /> {t.diseaseOverride}
+                                                            </span>
+                                                        )}
+                                                        {results.eOverride && (
+                                                            <span className={`text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${results.finalCat === 'extremeRisk'
+                                                                    ? 'bg-white/10 text-amber-200 border border-white/10'
+                                                                    : 'bg-amber-100 text-amber-700 border border-amber-200'
+                                                                }`}>
+                                                                <Droplets className="w-3 h-3" /> {t.extremeOverride}
+                                                            </span>
+                                                        )}
+                                                        {results.orthoOverride && (
+                                                            <span className={`text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${results.finalCat === 'extremeRisk'
+                                                                    ? 'bg-white/10 text-slate-200 border border-white/10'
+                                                                    : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                                                }`}>
+                                                                <AlertCircle className="w-3 h-3" /> {t.orthoOverride}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Score chip + breakdown — unified row */}
+                                            <div className={`flex items-center gap-3 pt-4 mt-auto ${results.finalCat === 'extremeRisk' ? 'border-t border-white/10' : 'border-t border-slate-200/60'
+                                                }`}>
+                                                {/* Net score */}
+                                                <div className={`flex-shrink-0 px-4 py-2.5 rounded-xl border-2 text-center min-w-[72px] ${results.finalCat === 'extremeRisk'
+                                                        ? 'border-white/20 bg-white/5'
+                                                        : 'border-slate-900 bg-white shadow-[2px_2px_0_#0f172a]'
+                                                    }`}>
+                                                    <div className={`text-2xl font-black font-mono leading-none ${results.finalCat === 'extremeRisk' ? 'text-white' : 'text-slate-900'
+                                                        }`} dir="ltr">
+                                                        {results.score > 0 ? '+' : ''}{toFa(results.score, lang)}
+                                                    </div>
+                                                    <span className={`text-[8px] font-bold uppercase tracking-widest ${results.finalCat === 'extremeRisk' ? 'text-white/50' : 'text-slate-400'
+                                                        }`}>{t.totalScore}</span>
+                                                </div>
+
+                                                {/* Breakdown chips */}
+                                                <div className="flex flex-wrap gap-1.5" dir="ltr">
+                                                    <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500 text-white text-[11px] font-bold font-mono shadow-sm">
+                                                        <Stethoscope className="w-3 h-3 opacity-70" />+{toFa(results.dScore, lang)}
+                                                    </span>
+                                                    <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-400 text-slate-900 text-[11px] font-bold font-mono shadow-sm">
+                                                        <Zap className="w-3 h-3 opacity-70" />+{toFa(results.rScore, lang)}
+                                                    </span>
+                                                    <span className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white text-[11px] font-bold font-mono shadow-sm">
+                                                        <ShieldCheck className="w-3 h-3 opacity-70" />−{toFa(results.pScore, lang)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Hyposalivation alert */}
+                                {results.hasHyposalivation && (
+                                    <div className="mt-3 bg-gradient-to-r from-slate-900 to-slate-800 text-white border-2 border-slate-900 rounded-xl px-5 py-3 flex items-center gap-3 shadow-[3px_3px_0_#cbd5e1]">
+                                        <div className="w-8 h-8 rounded-lg bg-amber-400/20 flex items-center justify-center flex-shrink-0">
+                                            <Droplets className="w-4 h-4 text-amber-400" />
+                                        </div>
+                                        <div>
+                                            <span className="text-xs font-bold block">{fa ? 'هیپوسالیواسیون' : 'Hyposalivation'}</span>
+                                            <span className="text-[11px] text-slate-400">{fa ? 'جریان بزاق کاهش‌یافته' : 'Reduced salivary flow detected'}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
 
                             {/* ── Score breakdown bars ── */}
@@ -1141,7 +1648,7 @@ export default function CambraApp() {
 
                                     {/* Bouncy Pinch Zoom Area */}
                                     <div className="md:col-span-2">
-                                    <BouncyPinchZoom src="/images/icdas.png" alt="ICDAS Reference" />
+                                        <BouncyPinchZoom src="/images/icdas.png" alt="ICDAS Reference" />
                                     </div>
                                 </div>
                                 {/* Proximal */}
