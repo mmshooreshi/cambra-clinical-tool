@@ -125,8 +125,11 @@ const CImg = ({ name, alt = '', className = '', style = {} }) => (
 // UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════════
 const FA = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-const toFa = (n, lang) => lang !== 'fa' ? String(n) : String(n).replace(/\d/g, d => FA[+d]);
-
+const toFa = (n, lang) => {
+    if (!n) return '';
+    let s = String(n).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); // تبدیل هر عدد فارسی احتمالی به انگلیسی
+    return lang !== 'fa' ? s : s.replace(/\d/g, d => FA[+d]); // حالا همه را یکدست به زبان مقصد تبدیل کن
+};
 /** Always store chartNo with English digits; display with locale digits */
 // const normalizeDigits = (str) =>
 //     str.replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 1728 + 48))
@@ -558,7 +561,7 @@ function PdfModal({ open, onClose, lang, patient, results, config, diseaseInd, r
             </div>
             <div class="info-grid">
                 <div class="info-card"><div class="info-label">${t?.patientName}</div><div class="info-value">${patient.name || '—'}</div></div>
-                <div class="info-card"><div class="info-label">${t?.chartNo}</div><div class="info-value mono">${patient.chartNo || '—'}</div></div>
+                <div class="info-card"><div class="info-label">${t?.chartNo}</div><div class="info-value mono">${toFa(patient.chartNo, lang) || '—'}</div></div>
                 <div class="info-card"><div class="info-label">${t?.date}</div><div class="info-value">${dateD}</div></div>
                 <div class="info-card"><div class="info-label">${t?.assessmentType}</div><div class="info-value">${patient.assessmentType === 'baseline' ? t?.baseline : t?.recall}</div></div>
             </div>
@@ -1032,14 +1035,14 @@ export default function CambraApp() {
                                     <div className="flex flex-col gap-1">
                                         <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.chartNo}</label>
                                         <div className="relative">
-                                            <input
-                                                type="text"
-                                                value={displayDigits(patient.chartNo, lang)}
-                                                onChange={e => {
-                                                    // const raw = normalizeDigits(e.target.value);
-                                                    const raw = e.target.value;
-                                                    setPatient(p => ({ ...p, chartNo: raw }));
-                                                }}
+<input
+    type="text"
+    value={toFa(patient.chartNo, lang)}
+    onChange={e => {
+        // اعداد فارسی را به انگلیسی تبدیل کرده و در استیت ذخیره می‌کنیم
+        const raw = e.target.value.replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+        setPatient(p => ({ ...p, chartNo: raw }));
+    }}
                                                 className="w-full text-sm font-medium font-mono px-3 pe-10 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900/10 transition-all bg-white"
                                                 placeholder={fa ? 'شماره پرونده' : 'Chart #'} />
                                             <button onClick={genChart} type="button" className="absolute top-1/2 -translate-y-1/2 end-1.5 w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center cursor-pointer active:scale-90 transition-all"><Shuffle className="w-3 h-3 text-white" /></button>
