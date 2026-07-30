@@ -1023,9 +1023,9 @@ export default function CambraApp() {
 
                                 {/* ICDAS */}
                                 {/* ICDAS and Pinch Zoom Image Grid */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                                     {/* Table Card */}
-                                    <div className="rounded-2xl border border-slate-200 overflow-hidden h-fit">
+                                    <div className="md:col-span-3 rounded-2xl border border-slate-200 overflow-hidden h-fit">
                                         <div className="bg-slate-900 px-4 py-2 flex items-center justify-between">
                                             <span className="text-white text-xs font-bold tracking-wider">ICDAS</span>
                                             <span className="text-slate-500 text-[8px] font-medium tracking-wider uppercase">{fa ? 'طبقه‌بندی ضایعات اکلوزال' : 'Occlusal Lesion Classification'}</span>
@@ -1033,7 +1033,7 @@ export default function CambraApp() {
                                         <table className="w-full text-xs border-collapse">
                                             <thead>
                                                 <tr className="bg-slate-50">
-                                                    <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 w-12">{fa ? 'کد' : 'Code'}</th>
+                                                    <th className="py-1.5 px-1 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100 w-3">{fa ? 'کد' : 'Code'}</th>
                                                     <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">{fa ? 'معنی' : 'Meaning'}</th>
                                                     <th className="py-1.5 px-3 text-start text-[9px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">{fa ? 'وضعیت' : 'Status'}</th>
                                                 </tr>
@@ -1041,7 +1041,7 @@ export default function CambraApp() {
                                             <tbody>
                                                 {icdasData.map(([code, meaning, status], i) => (
                                                     <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                                        <td className="py-1.5 px-3 font-mono font-bold text-center text-slate-900">{code}</td>
+                                                        <td className="py-1.5 px-1 font-mono font-bold text-center text-slate-900">{code}</td>
                                                         <td className="py-1.5 px-3 text-slate-700 font-medium text-[11px]">{meaning}</td>
                                                         <td className="py-1.5 px-3 text-slate-500 text-[10px]">{status}</td>
                                                     </tr>
@@ -1051,7 +1051,9 @@ export default function CambraApp() {
                                     </div>
 
                                     {/* Bouncy Pinch Zoom Area */}
+                                    <div class="md:col-span-2">
                                     <BouncyPinchZoom src="/images/icdas.png" alt="ICDAS Reference" />
+                                    </div>
                                 </div>
                                 {/* Proximal */}
                                 <div className="rounded-2xl border border-slate-200 overflow-hidden">                                <div className="bg-indigo-600 px-4 py-2 flex items-center justify-between">
