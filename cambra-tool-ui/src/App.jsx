@@ -860,7 +860,7 @@ td{padding:5px 8px;border-bottom:1px solid #f1f5f9;text-align:${fa ? 'right' : '
 const ADMIN_KEY = 'cambra_admin_2026';
 
 export default function CambraApp() {
-    const [lang, setLang] = useState('fa');
+    const [lang, setLang] = useState('en');
     const [tab, setTab] = useState('welcome');
     const [busy, setBusy] = useState(false);
     const [config, setConfig] = useState(null);
