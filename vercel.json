@@ -1,0 +1,14 @@
+{
+  "buildCommand": "cd cambra-tool-ui && npm install && npm run build",
+  "outputDirectory": "cambra-tool-ui/dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

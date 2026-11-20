@@ -8,6 +8,7 @@ import {
     Settings, Shuffle, FileText, Minus, Layers, Eye, EyeOff
 } from 'lucide-react';
 import BouncyPinchZoom from './components/BouncyPinchZoom';
+import { DEFAULT_CAMBRA_CONFIG } from './cambraConfig';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GLOBAL STYLES
@@ -863,7 +864,7 @@ export default function CambraApp() {
     const [lang, setLang] = useState('en');
     const [tab, setTab] = useState('welcome');
     const [busy, setBusy] = useState(false);
-    const [config, setConfig] = useState(null);
+    const [config, setConfig] = useState(DEFAULT_CAMBRA_CONFIG);
     const [showPdf, setShowPdf] = useState(false);
     const mainScrollRef = useRef(null);
 
@@ -872,9 +873,9 @@ export default function CambraApp() {
     const initDate = l => { const d = new Date(); if (l === 'fa') { const j = g2j(d.getFullYear(), d.getMonth() + 1, d.getDate()); return ds(j.jy, j.jm, j.jd) } return ds(d.getFullYear(), d.getMonth() + 1, d.getDate()) };
 
     const [patient, setPatient] = useState({ name: '', chartNo: '', date: initDate('fa'), assessmentType: 'baseline' });
-    const [dInd, setDInd] = useState([]);
-    const [rFact, setRFact] = useState([]);
-    const [pFact, setPFact] = useState([]);
+    const [dInd, setDInd] = useState(() => new Array(DEFAULT_CAMBRA_CONFIG.settings.diseaseCount).fill(false));
+    const [rFact, setRFact] = useState(() => new Array(DEFAULT_CAMBRA_CONFIG.settings.riskCount).fill(false));
+    const [pFact, setPFact] = useState(() => new Array(DEFAULT_CAMBRA_CONFIG.settings.protectiveCount).fill(false));
     const [alert, setAlert] = useState({ show: false, msg: '', type: 'info', cb: null });
 
     const [openDI, setOpenDI] = useState(null);
@@ -893,13 +894,17 @@ export default function CambraApp() {
     }, [lang]);
 
     useEffect(() => {
-        fetch('https://attendance.rlh.ir/appliance_survey/api/cambra/config')
-            .then(r => r.json()).then(data => {
-                setConfig(data); const s = data.settings;
-                setDInd(new Array(s.diseaseCount).fill(false));
-                setRFact(new Array(s.riskCount).fill(false));
-                setPFact(new Array(s.protectiveCount).fill(false));
-            }).catch(console.error);
+        // Gracefully attempt to fetch /api/config if available; otherwise DEFAULT_CAMBRA_CONFIG is already active
+        fetch('/api/config')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data && data.settings) {
+                    setConfig(data);
+                }
+            })
+            .catch(() => {
+                // Standalone mode is already active
+            });
     }, []);
 
     // useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }) }, [tab]);
@@ -942,13 +947,72 @@ export default function CambraApp() {
         try {
             const cd = config.dict[lang]; const gl = (arr, pfx) => arr.map((v, i) => v ? cd[`${pfx}_${i + 1}`] : null).filter(Boolean);
             let sd = patient.date; if (lang === 'fa' && patient.date) { const [y, m, d] = patient.date.split('-').map(Number); if (y < 1500) { const g = j2g(y, m, d); sd = ds(g.gy, g.gm, g.gd) } }
-            const payload = { patient_name: patient.name, chart_no: patient.chartNo, assessment_type: patient.assessmentType, disease_ind: JSON.stringify(gl(dInd, 'di')), risk_fact: JSON.stringify(gl(rFact, 'rf')), prot_fact: JSON.stringify(gl(pFact, 'pf')), severe_hypo: (results.hasHyposalivation || false).toString(), net_score: results.score, final_category: results.finalCat, raw_data: JSON.stringify({ patient: { ...patient, date: sd }, dInd, rFact, pFact }) };
-            const res = await fetch('https://attendance.rlh.ir/appliance_survey/api/cambra/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (res.ok) setAlert({ show: true, msg: lang === 'fa' ? 'ثبت شد!' : 'Submitted!', type: 'ok', cb: reset });
-            else setAlert({ show: true, msg: lang === 'fa' ? 'خطا' : 'Error', type: 'err' });
-        } catch { setAlert({ show: true, msg: lang === 'fa' ? 'اتصال اینترنت را بررسی کنید' : 'Check connection', type: 'err' }) }
-        setBusy(false);
+
+            const diseaseList = gl(dInd, 'di');
+            const riskList = gl(rFact, 'rf');
+            const protList = gl(pFact, 'pf');
+
+            const payload = {
+                patient_name: patient.name,
+                chart_no: patient.chartNo,
+                assessment_type: patient.assessmentType,
+                date: sd,
+                disease_ind: JSON.stringify(diseaseList),
+                risk_fact: JSON.stringify(riskList),
+                prot_fact: JSON.stringify(protList),
+                disease_list: diseaseList,
+                risk_list: riskList,
+                protective_list: protList,
+                severe_hypo: (results.hasHyposalivation || false).toString(),
+                net_score: results.score,
+                final_category: results.finalCat,
+                dScore: results.dScore,
+                rScore: results.rScore,
+                pScore: results.pScore,
+                dOverride: results.dOverride,
+                eOverride: results.eOverride,
+                orthoOverride: results.orthoOverride,
+                raw_data: JSON.stringify({ patient: { ...patient, date: sd }, dInd, rFact, pFact })
+            };
+
+            const sendReq = async (url) => {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                return res.ok;
+            };
+
+            const outcomes = await Promise.allSettled([
+                sendReq('/api/telegram'),
+                sendReq('/api/bale')
+            ]);
+
+            const anySuccess = outcomes.some(o => o.status === 'fulfilled' && o.value === true);
+
+            if (anySuccess) {
+                setAlert({
+                    show: true,
+                    msg: lang === 'fa' ? 'ارزیابی با موفقیت ثبت شد!' : 'Assessment submitted successfully!',
+                    type: 'ok',
+                    cb: reset
+                });
+            } else {
+                setAlert({
+                    show: true,
+                    msg: lang === 'fa' ? 'خطا در ارسال اطلاعات به بات. لطفاً متغیرهای محیطی تلگرام یا بله را بررسی کنید.' : 'Error sending to bot. Please check environment variables.',
+                    type: 'err'
+                });
+            }
+        } catch (err) {
+            console.error('Submission error:', err);
+            setAlert({ show: true, msg: lang === 'fa' ? 'اتصال اینترنت را بررسی کنید' : 'Check connection', type: 'err' });
+        } finally {
+            setBusy(false);
+        }
     };
+
 
 
     if (!config) return (
