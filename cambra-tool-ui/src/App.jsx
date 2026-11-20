@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import BouncyPinchZoom from './components/BouncyPinchZoom';
 import { DEFAULT_CAMBRA_CONFIG } from './cambraConfig';
+import AdminRecordsModal from './components/AdminRecordsModal';
+import AdminConfigModal from './components/AdminConfigModal';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GLOBAL STYLES
@@ -866,9 +868,27 @@ export default function CambraApp() {
     const [busy, setBusy] = useState(false);
     const [config, setConfig] = useState(DEFAULT_CAMBRA_CONFIG);
     const [showPdf, setShowPdf] = useState(false);
+    const [showAdminRecords, setShowAdminRecords] = useState(false);
+    const [showAdminConfig, setShowAdminConfig] = useState(false);
     const mainScrollRef = useRef(null);
 
     const isAdmin = useMemo(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('admin') === ADMIN_KEY, []);
+
+    // Check hash on load or hashchange for direct linking
+    useEffect(() => {
+        const checkHash = () => {
+            if (typeof window === 'undefined') return;
+            const hash = window.location.hash;
+            if (hash === '#admin-records' || window.location.pathname.includes('admin-cambra-789')) {
+                setShowAdminRecords(true);
+            } else if (hash === '#admin-config' || window.location.pathname.includes('admin-cambra-config')) {
+                setShowAdminConfig(true);
+            }
+        };
+        checkHash();
+        window.addEventListener('hashchange', checkHash);
+        return () => window.removeEventListener('hashchange', checkHash);
+    }, []);
 
     const initDate = l => { const d = new Date(); if (l === 'fa') { const j = g2j(d.getFullYear(), d.getMonth() + 1, d.getDate()); return ds(j.jy, j.jm, j.jd) } return ds(d.getFullYear(), d.getMonth() + 1, d.getDate()) };
 
@@ -894,6 +914,17 @@ export default function CambraApp() {
     }, [lang]);
 
     useEffect(() => {
+        try {
+            const saved = localStorage.getItem('cambra_custom_config');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && parsed.dict && parsed.settings) {
+                    setConfig(parsed);
+                    return;
+                }
+            }
+        } catch (e) {}
+
         // Gracefully attempt to fetch /api/config if available; otherwise DEFAULT_CAMBRA_CONFIG is already active
         fetch('/api/config')
             .then(r => r.ok ? r.json() : null)
@@ -984,6 +1015,20 @@ export default function CambraApp() {
                 return res.ok;
             };
 
+            // Always persist record to local storage for Admin Records panel
+            try {
+                const existing = JSON.parse(localStorage.getItem('cambra_patient_records') || '[]');
+                const newRecord = {
+                    id: `REC-${Date.now()}`,
+                    timestamp: new Date().toISOString(),
+                    ...payload
+                };
+                const updatedList = [newRecord, ...existing.filter(r => r.chart_no !== payload.chart_no)];
+                localStorage.setItem('cambra_patient_records', JSON.stringify(updatedList));
+            } catch (storageErr) {
+                console.warn('LocalStorage save failed:', storageErr);
+            }
+
             const outcomes = await Promise.allSettled([
                 sendReq('/api/telegram'),
                 sendReq('/api/bale')
@@ -1001,8 +1046,9 @@ export default function CambraApp() {
             } else {
                 setAlert({
                     show: true,
-                    msg: lang === 'fa' ? 'خطا در ارسال اطلاعات به بات. لطفاً متغیرهای محیطی تلگرام یا بله را بررسی کنید.' : 'Error sending to bot. Please check environment variables.',
-                    type: 'err'
+                    msg: lang === 'fa' ? 'اطلاعات در مرورگر ذخیره شد اما اتصال به ربات برقرار نشد (متغیرهای محیطی Vercel را بررسی کنید).' : 'Saved locally, but bot notification failed. Check environment variables.',
+                    type: 'ok',
+                    cb: reset
                 });
             }
         } catch (err) {
@@ -1010,6 +1056,30 @@ export default function CambraApp() {
             setAlert({ show: true, msg: lang === 'fa' ? 'اتصال اینترنت را بررسی کنید' : 'Check connection', type: 'err' });
         } finally {
             setBusy(false);
+        }
+    };
+
+    const loadRecordIntoForm = (rec) => {
+        try {
+            if (rec.raw_data) {
+                const raw = JSON.parse(rec.raw_data);
+                if (raw.patient) setPatient(raw.patient);
+                if (raw.dInd) setDInd(raw.dInd);
+                if (raw.rFact) setRFact(raw.rFact);
+                if (raw.pFact) setPFact(raw.pFact);
+                setTab('patient');
+            } else {
+                setPatient(p => ({
+                    ...p,
+                    name: rec.patient_name || '',
+                    chartNo: rec.chart_no || '',
+                    date: rec.date || p.date,
+                    assessmentType: rec.assessment_type || 'baseline'
+                }));
+                setTab('patient');
+            }
+        } catch (e) {
+            console.error('Error loading record:', e);
         }
     };
 
@@ -1082,7 +1152,41 @@ export default function CambraApp() {
                     <div><h1 className="font-bold text-sm text-slate-900 leading-tight">{t.title}</h1><span className="text-[8px] font-medium text-slate-400 tracking-wider uppercase">{t.subtitle}</span></div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                    {isAdmin && <a href="/appliance_survey/admin-cambra-789" target="_blank" className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-center cursor-pointer"><Settings className="w-3 h-3 text-slate-500" /></a>}
+                    {isAdmin ? (
+                        <>
+                            <button
+                                onClick={() => setShowAdminRecords(true)}
+                                className="h-7 px-2.5 rounded-lg bg-slate-900 text-white text-xs font-semibold flex items-center gap-1 hover:bg-slate-800 cursor-pointer active:scale-95 transition-all shadow-sm"
+                                title={fa ? 'مدیریت پرونده‌ها' : 'Records Manager'}
+                            >
+                                <FileText className="w-3.5 h-3.5 text-amber-400" />
+                                <span className="hidden sm:inline">{fa ? 'پرونده‌ها' : 'Records'}</span>
+                            </button>
+                            <button
+                                onClick={() => setShowAdminConfig(true)}
+                                className="h-7 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
+                                title={fa ? 'ویرایشگر متون و محتوا' : 'Content Editor'}
+                            >
+                                <Settings className="w-3.5 h-3.5 text-blue-600" />
+                                <span className="hidden sm:inline">{fa ? 'محتوا' : 'Config'}</span>
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                const pass = window.prompt(fa ? 'رمز عبور پنل ادمین را وارد کنید:' : 'Enter Admin Passkey:');
+                                if (pass === ADMIN_KEY) {
+                                    window.location.search = `?admin=${ADMIN_KEY}`;
+                                } else if (pass) {
+                                    alert(fa ? 'رمز عبور نادرست است' : 'Incorrect passkey');
+                                }
+                            }}
+                            className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-center cursor-pointer opacity-40 hover:opacity-100 transition-opacity"
+                            title={fa ? 'ورود به پنل ادمین' : 'Admin Login'}
+                        >
+                            <Settings className="w-3 h-3 text-slate-500" />
+                        </button>
+                    )}
                     <button onClick={() => setLang(lang === 'en' ? 'fa' : 'en')} className="h-7 px-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-600 cursor-pointer active:scale-95 transition-all">{t.language}</button>
                 </div>
             </header>
@@ -1503,6 +1607,21 @@ export default function CambraApp() {
             )}
 
             <PdfModal open={showPdf} onClose={() => setShowPdf(false)} lang={lang} patient={patient} results={results} config={config} diseaseInd={dInd} riskFact={rFact} protFact={pFact} />
+
+            <AdminRecordsModal
+                open={showAdminRecords}
+                onClose={() => setShowAdminRecords(false)}
+                onLoadRecord={loadRecordIntoForm}
+                lang={lang}
+            />
+
+            <AdminConfigModal
+                open={showAdminConfig}
+                onClose={() => setShowAdminConfig(false)}
+                config={config}
+                onSaveConfig={(newCfg) => setConfig(newCfg)}
+                lang={lang}
+            />
 
             {alert.show && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
