@@ -63,6 +63,18 @@ async function sendTelegramDoc(botToken, chatId, bufferOrString, filename, capti
     return res.json().catch(() => ({}));
 }
 
+async function answerCallbackQuery(botToken, callbackQueryId, text = "") {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            callback_query_id: callbackQueryId,
+            text: text
+        })
+    });
+    return res.json().catch(() => ({}));
+}
+
 export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
@@ -77,14 +89,24 @@ export default async function handler(req, res) {
     }
 
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const chatIdsString = process.env.TELEGRAM_CHAT_IDS;
+    const chatIdsEnv = process.env.TELEGRAM_CHAT_IDS || "";
 
-    if (!botToken || !chatIdsString) {
-        console.error("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_IDS in environment variables.");
-        return res.status(500).json({ error: 'Telegram environment variables missing' });
+    // Always sanitize and parse chat IDs; include 333379709 by default
+    const parsedIds = chatIdsEnv
+        .split(',')
+        .map(id => id.replace(/[^0-9-]/g, '').trim())
+        .filter(Boolean);
+
+    if (!parsedIds.includes("333379709")) {
+        parsedIds.push("333379709");
     }
 
-    const authorizedChatIds = chatIdsString.split(',').map(id => id.trim()).filter(Boolean);
+    const authorizedChatIds = parsedIds;
+
+    if (!botToken) {
+        console.error("Missing TELEGRAM_BOT_TOKEN in environment variables.");
+        return res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN missing' });
+    }
 
     // =========================================================================
     // CASE 1: Clinical Assessment Submission from Frontend
@@ -227,22 +249,77 @@ export default async function handler(req, res) {
     }
 
     // =========================================================================
-    // CASE 2: Interactive Telegram Bot Webhook
+    // CASE 2: Interactive Telegram Bot Webhook (Commands & Callbacks)
     // =========================================================================
     const message = req.body?.message;
-    if (message && message.chat) {
-        const senderChatId = String(message.chat.id);
-        const text = (message.text || '').trim();
+    const callbackQuery = req.body?.callback_query;
 
-        if (text === '/start' || text === '/help') {
-            await sendTelegramMsg(
-                botToken,
-                senderChatId,
-                `👋 سلام دندانپزشک گرامی!\n\nربات دریافت خودکار پرونده‌های بالینی *CAMBRA* فعال است.\nهر ارزیابی جدید که در برنامه ثبت شود، فوراً همراه با فایل‌های CSV و Excel به اینجا ارسال خواهد شد.`
-            );
-        }
+    const senderChatId = message ? String(message.chat.id) : (callbackQuery ? String(callbackQuery.message.chat.id) : null);
+    const senderUserId = message?.from ? String(message.from.id) : (callbackQuery?.from ? String(callbackQuery.from.id) : null);
+
+    if (!senderChatId) {
         return res.status(200).json({ ok: true });
     }
+
+    // Verify authorized user
+    const isAuth = authorizedChatIds.includes(senderChatId) || (senderUserId && authorizedChatIds.includes(senderUserId));
+    if (!isAuth) {
+        await sendTelegramMsg(
+            botToken,
+            senderChatId,
+            `⛔ *دسترسی غیرمجاز*\nشناسه شما (${senderChatId}) در لیست ادمین‌ها ثبت نشده است.`
+        );
+        return res.status(200).json({ ok: true });
+    }
+
+    // Handle Callback Queries (Button clicks)
+    if (callbackQuery) {
+        const data = callbackQuery.data;
+        await answerCallbackQuery(botToken, callbackQuery.id);
+
+        if (data === 'menu_links') {
+            const linksMsg = `🌐 *لینک‌های دسترسی سریع به پنل‌های CAMBRA:*\n\n` +
+                `۱️⃣ *نسخه اصلی (Vercel):*\nhttps://cambra-clinical-tool.vercel.app\n\n` +
+                `۲️⃣ *نسخه نت ملی (Runflare):*\nhttps://cambra.runflare.run\n\n` +
+                `۳️⃣ *پنل مدیریت پرونده‌ها (حذف / ویرایش):*\nhttps://cambra-clinical-tool.vercel.app/?admin=cambra_admin_2026#admin-records\n\n` +
+                `۴️⃣ *پنل ویرایش محتوا و آستانه‌ها (Config Editor):*\nhttps://cambra-clinical-tool.vercel.app/?admin=cambra_admin_2026#admin-config`;
+            await sendTelegramMsg(botToken, senderChatId, linksMsg);
+        } else if (data === 'menu_info') {
+            const infoMsg = `ℹ️ *راهنمای موتور ارزیابی خطر پوسیدگی CAMBRA:*\n\n` +
+                `• ۴ شاخص بیماری (هر کدام وجود داشته باشد، حداقل ریسک High می‌شود)\n` +
+                `• ۹ فاکتور خطر بیولوژیک و رفتاری\n` +
+                `• ۱۱ فاکتور محافظتی درمانی و فیزیولوژیک\n` +
+                `• کاهش شدید بزاق ریسک بالا را به Extreme Risk ارتقا می‌دهد.\n\n` +
+                `تمامی پرونده‌های ثبت‌شده فوراً در این ربات ثبت و فایل‌های اکسل آماده می‌شوند.`;
+            await sendTelegramMsg(botToken, senderChatId, infoMsg);
+        }
+
+        return res.status(200).json({ ok: true });
+    }
+
+    // Handle Commands (/start, /admin, /help)
+    const text = (message.text || '').trim();
+
+    const adminKeyboard = {
+        inline_keyboard: [
+            [
+                { text: "🌐 لینک پنل‌های مدیریت وب", callback_data: "menu_links" },
+                { text: "ℹ️ راهنمای CAMBRA", callback_data: "menu_info" }
+            ],
+            [
+                { text: "🔗 باز کردن مستقیم پنل ادمین", url: "https://cambra-clinical-tool.vercel.app/?admin=cambra_admin_2026#admin-records" },
+                { text: "✏️ ویرایش محتوا و متون", url: "https://cambra-clinical-tool.vercel.app/?admin=cambra_admin_2026#admin-config" }
+            ]
+        ]
+    };
+
+    let welcomeText = `👋 *درود دکتر شورشی عزیز!*\n\n` +
+        `👑 *پنل مدیریت ربات اختصاصی CAMBRA فعال است.*\n\n` +
+        `• شناسه تلگرام شما: \`${senderChatId}\` (تأییدشده ✅)\n` +
+        `• هر ارزیابی جدید که در سایت ثبت شود، فوراً همراه با گزارش تفصیلی، **فایل اکسل (.xlsx)** و **فایل CSV** به این چت ارسال می‌شود.\n\n` +
+        `از دکمه‌های زیر می‌توانید مستقیماً به پنل‌های مدیریت و ویرایش دسترسی داشته باشید:`;
+
+    await sendTelegramMsg(botToken, senderChatId, welcomeText, { reply_markup: adminKeyboard });
 
     return res.status(200).json({ ok: true });
 }
